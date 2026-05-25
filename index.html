@@ -139,7 +139,8 @@
   }
   .badge-todo { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
   .badge-progress { background: var(--accent-soft); color: #ff5b5b; border: 1px solid var(--accent-border); }
-  .badge-done { background: rgba(74,124,89,0.15); color: #6dab82; border: 1px solid rgba(74,124,89,0.35); }
+  .task.delayed::before { background: #c87c00; }
+  .badge-delayed { background: rgba(200,124,0,0.15); color: #e09430; border: 1px solid rgba(200,124,0,0.35); }
 
   .task-meta { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   .meta-item { font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 4px; }
@@ -276,6 +277,7 @@
     <button class="filter-btn active" data-filter="all">Все</button>
     <button class="filter-btn" data-filter="todo">Не начато</button>
     <button class="filter-btn" data-filter="in-progress">В работе</button>
+    <button class="filter-btn" data-filter="delayed">Задерживается</button>
     <button class="filter-btn" data-filter="done">Готово</button>
   </div>
   <div class="section-label">Все задачи</div>
@@ -321,6 +323,7 @@
       <select id="f-status">
         <option value="todo">Не начато</option>
         <option value="in-progress">В работе</option>
+        <option value="delayed">Задерживается</option>
         <option value="done">Готово</option>
       </select>
     </div>
@@ -456,9 +459,10 @@ const PROJECT_LABELS = {
 };
 
 const STATUS_META = {
-  'todo':        { label:'Не начато', cls:'badge-todo',     taskCls:'todo' },
-  'in-progress': { label:'В работе',  cls:'badge-progress', taskCls:'in-progress' },
-  'done':        { label:'Готово',    cls:'badge-done',     taskCls:'done' },
+  'todo':        { label:'Не начато',    cls:'badge-todo',     taskCls:'todo' },
+  'in-progress': { label:'В работе',     cls:'badge-progress', taskCls:'in-progress' },
+  'delayed':     { label:'Задерживается',cls:'badge-delayed',  taskCls:'delayed' },
+  'done':        { label:'Готово',       cls:'badge-done',     taskCls:'done' },
 };
 
 let MEMBERS = [];
@@ -693,7 +697,7 @@ function escapeHtml(s) {
 async function cycleStatus(id, currentStatus) {
   const t = tasks.find(x => x.id === id);
   if (t && !canEditTask(t)) return;
-  const cycle = ['todo','in-progress','done'];
+  const cycle = ['todo','in-progress','delayed','done'];
   const nextStatus = cycle[(cycle.indexOf(currentStatus) + 1) % cycle.length];
   tasks = tasks.map(t => t.id === id ? {...t, status: nextStatus} : t);
   renderAll();
