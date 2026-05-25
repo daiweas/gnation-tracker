@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GNATION // Трекер</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Unbounded:wght@400;700;900&display=swap');
+
+  :root {
+    --bg: #0a0a0a;
+    --surface: #141414;
+    --surface2: #1e1e1e;
+    --accent: #c8ff00;
+    --accent2: #ff4d6d;
+    --accent3: #00d4ff;
+    --accent4: #b464ff;
+    --text: #f0f0f0;
+    --muted: #555;
+    --border: #2a2a2a;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    min-height: 100vh;
+    padding: 20px 14px 100px;
+    max-width: 600px;
+    margin: 0 auto;
+  }
+
+  header { margin-bottom: 20px; }
+  .logo { font-family: 'Unbounded', sans-serif; font-weight: 900; font-size: 20px; color: var(--accent); letter-spacing: -1px; margin-bottom: 3px; }
+  .subtitle { font-size: 10px; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; }
+
+  .sync-bar { display: flex; align-items: center; gap: 7px; margin-bottom: 16px; font-size: 10px; color: var(--muted); }
+  .sync-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); flex-shrink: 0; transition: background 0.3s; }
+  .sync-dot.ok { background: var(--accent); }
+  .sync-dot.err { background: var(--accent2); }
+  .sync-dot.loading { background: var(--accent3); animation: pulse 0.8s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.3} }
+
+  .tabs-wrap { overflow-x: auto; margin-bottom: 20px; padding-bottom: 2px; }
+  .tabs-wrap::-webkit-scrollbar { display: none; }
+  .tabs { display: flex; border-bottom: 1px solid var(--border); width: max-content; min-width: 100%; }
+  .tab { padding: 8px 14px; font-family: 'Space Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); background: transparent; border: none; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.15s; white-space: nowrap; }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
+  .stat { background: var(--surface); border: 1px solid var(--border); padding: 10px; text-align: center; }
+  .stat-num { font-family: 'Unbounded', sans-serif; font-size: 20px; font-weight: 900; color: var(--accent); line-height: 1; }
+  .stat-label { font-size: 9px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; margin-top: 3px; }
+
+  .progress-bar { height: 3px; background: var(--border); margin-bottom: 16px; }
+  .progress-fill { height: 100%; background: var(--accent); transition: width 0.4s ease; }
+
+  .filters { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+  .filter-btn { padding: 5px 12px; border-radius: 2px; border: 1px solid var(--border); background: var(--surface); color: var(--muted); font-family: 'Space Mono', monospace; font-size: 10px; cursor: pointer; transition: all 0.15s; text-transform: uppercase; letter-spacing: 1px; }
+  .filter-btn.active { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 700; }
+  .filter-btn:hover:not(.active) { border-color: var(--accent); color: var(--accent); }
+
+  .member-card { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); padding: 14px; margin-bottom: 16px; }
+  .member-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .avatar { width: 38px; height: 38px; border-radius: 2px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-family: 'Unbounded', sans-serif; font-size: 12px; font-weight: 900; }
+  .member-name { font-family: 'Unbounded', sans-serif; font-size: 13px; font-weight: 700; }
+  .member-role { font-size: 10px; color: var(--muted); margin-top: 2px; }
+  .member-stats { display: flex; gap: 12px; }
+  .member-stat { font-size: 10px; }
+  .member-stat .num { font-family: 'Unbounded', sans-serif; font-weight: 700; }
+
+  .tasks { display: flex; flex-direction: column; gap: 7px; margin-bottom: 16px; }
+  .task { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid transparent; padding: 12px; transition: all 0.15s; cursor: pointer; }
+  .task:hover { background: var(--surface2); }
+  .task.done { opacity: 0.45; border-left-color: var(--accent); }
+  .task.in-progress { border-left-color: var(--accent3); }
+  .task.todo { border-left-color: var(--muted); }
+
+  .task-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 7px; }
+  .task-name { font-size: 12px; font-weight: 700; line-height: 1.3; flex: 1; }
+  .task.done .task-name { text-decoration: line-through; color: var(--muted); }
+
+  .status-badge { font-size: 9px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; padding: 3px 7px; border-radius: 2px; white-space: nowrap; flex-shrink: 0; }
+  .badge-todo { background: #1e1e1e; color: var(--muted); border: 1px solid var(--border); }
+  .badge-progress { background: rgba(0,212,255,0.1); color: var(--accent3); border: 1px solid rgba(0,212,255,0.3); }
+  .badge-done { background: rgba(200,255,0,0.1); color: var(--accent); border: 1px solid rgba(200,255,0,0.3); }
+
+  .task-meta { display: flex; gap: 10px; flex-wrap: wrap; }
+  .meta-item { font-size: 10px; color: var(--muted); display: flex; align-items: center; gap: 3px; }
+  .meta-item span { color: var(--text); opacity: 0.7; }
+
+  .project-tag { font-size: 9px; padding: 2px 6px; border-radius: 2px; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; }
+  .tag-track { background: rgba(255,77,109,0.15); color: var(--accent2); }
+  .tag-video { background: rgba(0,212,255,0.15); color: var(--accent3); }
+  .tag-recording { background: rgba(200,255,0,0.15); color: var(--accent); }
+  .tag-course { background: rgba(180,100,255,0.15); color: var(--accent4); }
+  .tag-venue { background: rgba(255,180,0,0.15); color: #ffb400; }
+  .tag-visual { background: rgba(180,100,255,0.15); color: var(--accent4); }
+  .tag-other { background: rgba(100,100,100,0.15); color: var(--muted); }
+
+  .section-label { font-family: 'Unbounded', sans-serif; font-size: 9px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+
+  .add-btn { width: 100%; padding: 12px; background: transparent; border: 1px dashed var(--border); color: var(--muted); font-family: 'Space Mono', monospace; font-size: 11px; cursor: pointer; transition: all 0.15s; text-transform: uppercase; letter-spacing: 1px; }
+  .add-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .delete-btn { background: none; border: none; color: var(--muted); font-size: 15px; cursor: pointer; padding: 0 0 0 6px; line-height: 1; transition: color 0.15s; flex-shrink: 0; }
+  .delete-btn:hover { color: var(--accent2); }
+
+  .empty { text-align: center; color: var(--muted); font-size: 11px; padding: 30px 20px; border: 1px dashed var(--border); }
+
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 100; padding: 16px; overflow-y: auto; }
+  .modal-overlay.open { display: flex; align-items: flex-start; justify-content: center; }
+  .modal { background: var(--surface); border: 1px solid var(--border); width: 100%; max-width: 480px; padding: 20px; margin-top: 30px; }
+  .modal-title { font-family: 'Unbounded', sans-serif; font-size: 13px; font-weight: 700; color: var(--accent); margin-bottom: 18px; letter-spacing: 1px; }
+  .form-group { margin-bottom: 14px; }
+  label { display: block; font-size: 9px; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 5px; }
+  input, select, textarea { width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text); font-family: 'Space Mono', monospace; font-size: 12px; padding: 9px; outline: none; transition: border-color 0.15s; -webkit-appearance: none; border-radius: 0; }
+  input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+  textarea { resize: vertical; min-height: 60px; }
+  select option { background: var(--surface); }
+  .modal-btns { display: flex; gap: 10px; margin-top: 18px; }
+  .btn-save { flex: 1; padding: 11px; background: var(--accent); color: #000; font-family: 'Unbounded', sans-serif; font-size: 10px; font-weight: 700; border: none; cursor: pointer; letter-spacing: 1px; text-transform: uppercase; }
+  .btn-cancel { padding: 11px 18px; background: transparent; border: 1px solid var(--border); color: var(--muted); font-family: 'Space Mono', monospace; font-size: 10px; cursor: pointer; }
+
+  .page { display: none; }
+  .page.active { display: block; }
+
+  .spinner { text-align: center; padding: 40px; color: var(--muted); font-size: 11px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">// GNATION</div>
+  <div class="subtitle">Трекер задач</div>
+</header>
+
+<div class="sync-bar">
+  <div class="sync-dot loading" id="sync-dot"></div>
+  <span id="sync-label">Подключение...</span>
+</div>
+
+<div class="tabs-wrap">
+  <div class="tabs" id="tabs"></div>
+</div>
+
+<div id="page-all" class="page active">
+  <div class="stats">
+    <div class="stat"><div class="stat-num" id="stat-total">—</div><div class="stat-label">Всего</div></div>
+    <div class="stat"><div class="stat-num" id="stat-progress" style="color:var(--accent3)">—</div><div class="stat-label">В работе</div></div>
+    <div class="stat"><div class="stat-num" id="stat-done">—</div><div class="stat-label">Готово</div></div>
+  </div>
+  <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+  <div class="filters" id="filters">
+    <button class="filter-btn active" data-filter="all">Все</button>
+    <button class="filter-btn" data-filter="todo">Не начато</button>
+    <button class="filter-btn" data-filter="in-progress">В работе</button>
+    <button class="filter-btn" data-filter="done">Готово</button>
+  </div>
+  <div class="section-label">Все задачи</div>
+  <div class="tasks" id="all-tasks-list"><div class="spinner">Загрузка...</div></div>
+  <button class="add-btn" onclick="openModal('all')">+ Добавить задачу</button>
+</div>
+
+<div id="member-pages"></div>
+
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-title" id="modal-title">НОВАЯ ЗАДАЧА</div>
+    <div class="form-group"><label>Название</label><input type="text" id="f-name" placeholder="Что нужно сделать?" /></div>
+    <div class="form-group">
+      <label>Проект</label>
+      <select id="f-project">
+        <option value="track">Трек saintrap</option>
+        <option value="recording">Запись Луки</option>
+        <option value="video">Видос с вопросами</option>
+        <option value="venue">Поиск площадки</option>
+        <option value="visual">Обложка / визуал</option>
+        <option value="course">Онлайн-курс</option>
+        <option value="other">Другое</option>
+      </select>
+    </div>
+    <div class="form-group"><label>Ответственный</label><select id="f-person"></select></div>
+    <div class="form-group">
+      <label>День / дедлайн</label>
+      <select id="f-day">
+        <option value="Ср, 28 мая">Ср, 28 мая</option>
+        <option value="Чт, 29 мая">Чт, 29 мая</option>
+        <option value="Пт, 30 мая">Пт, 30 мая</option>
+        <option value="Сб, 31 мая">Сб, 31 мая</option>
+        <option value="До конца недели">До конца недели</option>
+        <option value="Без срока">Без срока</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Статус</label>
+      <select id="f-status">
+        <option value="todo">Не начато</option>
+        <option value="in-progress">В работе</option>
+        <option value="done">Готово</option>
+      </select>
+    </div>
+    <div class="form-group"><label>Заметка</label><textarea id="f-note" placeholder="Детали..."></textarea></div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal()">Отмена</button>
+      <button class="btn-save" onclick="saveTask()">СОХРАНИТЬ</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://cetppwtxkkucyylfpxlq.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_Xxp4jkRbsWeVroqrp2siKw_efm94XXM';
+
+const MEMBERS = [
+  { id:'daiw',     display:'DAIW',       role:'Артист · Продюсер · Битмейкер', color:'#c8ff00', bg:'#1a2200' },
+  { id:'tuti',     display:'Тути Фрути', role:'Менеджер · Оператор',           color:'#ff4d6d', bg:'#220010' },
+  { id:'luka',     display:'Лука',       role:'Артист · Хелпер',               color:'#00d4ff', bg:'#001a22' },
+  { id:'saintrap', display:'saintrap',   role:'Артист',                        color:'#ffb400', bg:'#221a00' },
+  { id:'andrey',   display:'Андрей',     role:'Артист',                        color:'#b464ff', bg:'#160022' },
+  { id:'ulfsees',  display:'ulfsees',    role:'Визуал · Креативный директор',  color:'#ff8c42', bg:'#221000' },
+  { id:'ksusha',   display:'Ксюша',      role:'Оператор · Монтаж',             color:'#5dca8d', bg:'#00220f' },
+];
+
+const PROJECT_LABELS = {
+  track:     { label:'Трек',      cls:'tag-track' },
+  recording: { label:'Запись',    cls:'tag-recording' },
+  video:     { label:'Видос',     cls:'tag-video' },
+  venue:     { label:'Площадка',  cls:'tag-venue' },
+  visual:    { label:'Визуал',    cls:'tag-visual' },
+  course:    { label:'Курс',      cls:'tag-course' },
+  other:     { label:'Другое',    cls:'tag-other' },
+};
+
+const STATUS_META = {
+  'todo':        { label:'Не начато', cls:'badge-todo',     taskCls:'todo' },
+  'in-progress': { label:'В работе',  cls:'badge-progress', taskCls:'in-progress' },
+  'done':        { label:'Готово',    cls:'badge-done',     taskCls:'done' },
+};
+
+const DEFAULT_TASKS = [
+  { name:'Расставить дорожки, темп, чистка',               project:'track',     person:'daiw',     day:'Ср, 28 мая',      status:'todo',        note:'Без сведения — только подготовка' },
+  { name:'Само сведение трека',                             project:'track',     person:'daiw',     day:'Пт, 30 мая',      status:'todo',        note:'После перерыва — ухо отдохнёт' },
+  { name:'Монтаж видоса — вставки со студии между вопросами', project:'video',   person:'ksusha',   day:'Чт, 29 мая',      status:'in-progress', note:'Основной звук сохраняется, картинка без звука' },
+  { name:'Записать Луку на студии',                         project:'recording', person:'daiw',     day:'Сб, 31 мая',      status:'todo',        note:'Место: студия. Лука знает материал' },
+  { name:'Пройти онлайн-курс',                              project:'course',    person:'daiw',     day:'Пт, 30 мая',      status:'todo',        note:'~20 мин утром' },
+  { name:'Найти площадку для первого выступления',          project:'venue',     person:'tuti',     day:'До конца недели', status:'todo',        note:'Нужны колонки, микрофоны. Скинуть Саше' },
+  { name:'Забронировать студию для записи Луки',            project:'recording', person:'tuti',     day:'Ср, 28 мая',      status:'todo',        note:'' },
+  { name:'Скорректировать работы ulfsees',                  project:'visual',    person:'luka',     day:'До конца недели', status:'todo',        note:'Второй взгляд перед модерацией Саши' },
+  { name:'Написать референсы и идеи для бита',              project:'other',     person:'andrey',   day:'До конца недели', status:'todo',        note:'Скинуть DAIW — нужно для написания бита' },
+  { name:'Обложка для видоса с вопросами',                  project:'visual',    person:'ulfsees',  day:'Сб, 31 мая',      status:'in-progress', note:'' },
+  { name:'Придумать название видоса с вопросами',           project:'visual',    person:'ulfsees',  day:'Сб, 31 мая',      status:'in-progress', note:'Финал за DAIW' },
+  { name:'Быть на записи Луки',                             project:'recording', person:'saintrap', day:'Сб, 31 мая',      status:'todo',        note:'' },
+  { name:'Съёмка на студии и локациях',                     project:'video',     person:'tuti',     day:'Без срока',       status:'todo',        note:'Материал для вставок' },
+  { name:'Снимать команду (TikTok/Reels формат)',           project:'video',     person:'ksusha',   day:'Без срока',       status:'todo',        note:'5 лет опыта' },
+];
+
+let tasks = [];
+let currentFilter = 'all';
+let currentTab = 'all';
+let modalContext = 'all';
+let seeded = false;
+
+function api(path, opts={}) {
+  return fetch(SUPABASE_URL + '/rest/v1/' + path, {
+    ...opts,
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': 'Bearer ' + SUPABASE_KEY,
+      'Content-Type': 'application/json',
+      'Prefer': opts.prefer || 'return=representation',
+      ...(opts.headers||{})
+    }
+  });
+}
+
+function setSyncStatus(state, text) {
+  document.getElementById('sync-dot').className = 'sync-dot ' + state;
+  document.getElementById('sync-label').textContent = text;
+}
+
+function now() {
+  return new Date().toLocaleTimeString('ru', {hour:'2-digit', minute:'2-digit'});
+}
+
+async function loadTasks() {
+  setSyncStatus('loading', 'Загрузка...');
+  try {
+    const res = await api('tasks?select=*&order=id.asc');
+    const data = await res.json();
+    if (!res.ok) throw new Error(JSON.stringify(data));
+
+    if (data.length === 0 && !seeded) {
+      seeded = true;
+      await seedTasks();
+      return;
+    }
+
+    tasks = data;
+    setSyncStatus('ok', 'Синхронизировано · ' + now());
+    renderAll();
+  } catch(e) {
+    setSyncStatus('err', 'Ошибка: ' + e.message);
+  }
+}
+
+async function seedTasks() {
+  setSyncStatus('loading', 'Первый запуск...');
+  try {
+    const res = await api('tasks', {
+      method: 'POST',
+      body: JSON.stringify(DEFAULT_TASKS),
+      prefer: 'return=representation'
+    });
+    const data = await res.json();
+    tasks = data;
+    setSyncStatus('ok', 'Данные загружены · ' + now());
+    renderAll();
+  } catch(e) {
+    setSyncStatus('err', 'Ошибка инициализации');
+  }
+}
+
+async function pollTasks() {
+  try {
+    const res = await api('tasks?select=*&order=id.asc');
+    const data = await res.json();
+    if (JSON.stringify(data) !== JSON.stringify(tasks)) {
+      tasks = data;
+      renderAll();
+      setSyncStatus('ok', 'Обновлено · ' + now());
+    }
+  } catch(e) {}
+}
+
+async function updateTask(id, fields) {
+  setSyncStatus('loading', 'Сохранение...');
+  try {
+    const res = await api('tasks?id=eq.' + id, {
+      method: 'PATCH',
+      body: JSON.stringify(fields),
+      prefer: 'return=representation'
+    });
+    if (!res.ok) throw new Error();
+    const [updated] = await res.json();
+    tasks = tasks.map(t => t.id === id ? updated : t);
+    setSyncStatus('ok', 'Сохранено · ' + now());
+    renderAll();
+  } catch(e) {
+    setSyncStatus('err', 'Ошибка сохранения');
+  }
+}
+
+async function deleteTask(id) {
+  tasks = tasks.filter(t => t.id !== id);
+  renderAll();
+  setSyncStatus('loading', 'Удаление...');
+  try {
+    await api('tasks?id=eq.' + id, { method: 'DELETE', prefer: '' });
+    setSyncStatus('ok', 'Удалено · ' + now());
+  } catch(e) {
+    setSyncStatus('err', 'Ошибка удаления');
+  }
+}
+
+async function createTask(fields) {
+  setSyncStatus('loading', 'Сохранение...');
+  try {
+    const res = await api('tasks', {
+      method: 'POST',
+      body: JSON.stringify(fields),
+      prefer: 'return=representation'
+    });
+    if (!res.ok) throw new Error();
+    const [created] = await res.json();
+    tasks.push(created);
+    setSyncStatus('ok', 'Сохранено · ' + now());
+    renderAll();
+  } catch(e) {
+    setSyncStatus('err', 'Ошибка создания');
+  }
+}
+
+function buildTabs() {
+  const wrap = document.getElementById('tabs');
+  wrap.innerHTML = '';
+  const allBtn = document.createElement('button');
+  allBtn.className = 'tab active'; allBtn.dataset.tab = 'all';
+  allBtn.textContent = 'Все'; allBtn.onclick = () => switchTab('all');
+  wrap.appendChild(allBtn);
+  MEMBERS.forEach(m => {
+    const btn = document.createElement('button');
+    btn.className = 'tab'; btn.dataset.tab = m.id;
+    btn.textContent = m.display; btn.onclick = () => switchTab(m.id);
+    wrap.appendChild(btn);
+  });
+
+  const pagesWrap = document.getElementById('member-pages');
+  pagesWrap.innerHTML = '';
+  MEMBERS.forEach(m => {
+    const div = document.createElement('div');
+    div.className = 'page'; div.id = 'page-' + m.id;
+    div.innerHTML = `
+      <div class="member-card" style="border-left-color:${m.color}; margin-bottom:16px;">
+        <div class="member-header">
+          <div class="avatar" style="background:${m.bg};color:${m.color};">${m.display.slice(0,2).toUpperCase()}</div>
+          <div>
+            <div class="member-name" style="color:${m.color}">${m.display}</div>
+            <div class="member-role">${m.role}</div>
+          </div>
+        </div>
+        <div class="member-stats" id="mstats-${m.id}"></div>
+      </div>
+      <div class="section-label">Задачи</div>
+      <div class="tasks" id="tasks-${m.id}"><div class="spinner">Загрузка...</div></div>
+      <button class="add-btn" onclick="openModal('${m.id}')">+ Добавить задачу</button>
+    `;
+    pagesWrap.appendChild(div);
+  });
+}
+
+function switchTab(tabId) {
+  currentTab = tabId;
+  document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tabId));
+  document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + tabId));
+}
+
+function renderAll() {
+  renderAllTasks();
+  MEMBERS.forEach(m => renderMember(m));
+  const total = tasks.length;
+  const done = tasks.filter(t => t.status === 'done').length;
+  const inprog = tasks.filter(t => t.status === 'in-progress').length;
+  document.getElementById('stat-total').textContent = total;
+  document.getElementById('stat-done').textContent = done;
+  document.getElementById('stat-progress').textContent = inprog;
+  document.getElementById('progress-fill').style.width = total ? (done/total*100)+'%' : '0%';
+}
+
+function renderAllTasks() {
+  const list = document.getElementById('all-tasks-list');
+  const filtered = tasks.filter(t => currentFilter === 'all' || t.status === currentFilter);
+  list.innerHTML = filtered.length ? filtered.map(taskHTML).join('') : '<div class="empty">Задач нет</div>';
+}
+
+function renderMember(m) {
+  const el = document.getElementById('tasks-' + m.id);
+  if (!el) return;
+  const mt = tasks.filter(t => t.person === m.id);
+  const done = mt.filter(t => t.status === 'done').length;
+  const inprog = mt.filter(t => t.status === 'in-progress').length;
+  const statsEl = document.getElementById('mstats-' + m.id);
+  if (statsEl) statsEl.innerHTML = `
+    <span class="member-stat"><span class="num">${mt.length}</span> <span style="color:var(--muted)">задач</span></span>
+    <span class="member-stat" style="color:var(--accent3)"><span class="num">${inprog}</span> <span style="color:var(--muted)">в работе</span></span>
+    <span class="member-stat" style="color:var(--accent)"><span class="num">${done}</span> <span style="color:var(--muted)">готово</span></span>
+  `;
+  el.innerHTML = mt.length ? mt.map(taskHTML).join('') : '<div class="empty">Задач нет</div>';
+}
+
+function taskHTML(t) {
+  const proj = PROJECT_LABELS[t.project] || { label: t.project, cls: 'tag-other' };
+  const st = STATUS_META[t.status] || STATUS_META['todo'];
+  const member = MEMBERS.find(m => m.id === t.person);
+  const personLabel = member ? member.display : t.person;
+  return `
+    <div class="task ${st.taskCls}" onclick="cycleStatus(${t.id}, '${t.status}')">
+      <div class="task-top">
+        <div class="task-name">${t.name}</div>
+        <div style="display:flex;align-items:center;gap:5px">
+          <span class="status-badge ${st.cls}">${st.label}</span>
+          <button class="delete-btn" onclick="event.stopPropagation();deleteTask(${t.id})">×</button>
+        </div>
+      </div>
+      <div class="task-meta">
+        <span class="project-tag ${proj.cls}">${proj.label}</span>
+        <span class="meta-item">👤 <span>${personLabel}</span></span>
+        <span class="meta-item">📅 <span>${t.day}</span></span>
+        ${t.note ? `<span class="meta-item" style="width:100%;margin-top:3px;opacity:0.6">↳ ${t.note}</span>` : ''}
+      </div>
+    </div>
+  `;
+}
+
+async function cycleStatus(id, currentStatus) {
+  const cycle = ['todo','in-progress','done'];
+  const nextStatus = cycle[(cycle.indexOf(currentStatus) + 1) % cycle.length];
+  tasks = tasks.map(t => t.id === id ? {...t, status: nextStatus} : t);
+  renderAll();
+  await updateTask(id, { status: nextStatus });
+}
+
+function openModal(context) {
+  modalContext = context;
+  const m = MEMBERS.find(m => m.id === context);
+  document.getElementById('modal-title').textContent = m ? 'ЗАДАЧА ДЛЯ ' + m.display.toUpperCase() : 'НОВАЯ ЗАДАЧА';
+  const sel = document.getElementById('f-person');
+  sel.innerHTML = MEMBERS.map(m => `<option value="${m.id}" ${m.id === context ? 'selected' : ''}>${m.display}</option>`).join('');
+  document.getElementById('modal').classList.add('open');
+  setTimeout(() => document.getElementById('f-name').focus(), 100);
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.remove('open');
+  document.getElementById('f-name').value = '';
+  document.getElementById('f-note').value = '';
+  document.getElementById('f-status').value = 'todo';
+}
+
+async function saveTask() {
+  const name = document.getElementById('f-name').value.trim();
+  if (!name) { document.getElementById('f-name').focus(); return; }
+  const fields = {
+    name,
+    project: document.getElementById('f-project').value,
+    person: document.getElementById('f-person').value,
+    day: document.getElementById('f-day').value,
+    status: document.getElementById('f-status').value,
+    note: document.getElementById('f-note').value.trim(),
+  };
+  closeModal();
+  await createTask(fields);
+}
+
+document.getElementById('filters').addEventListener('click', e => {
+  const btn = e.target.closest('.filter-btn');
+  if (!btn) return;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  currentFilter = btn.dataset.filter;
+  renderAllTasks();
+});
+
+document.getElementById('modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal')) closeModal();
+});
+
+buildTabs();
+loadTasks();
+setInterval(pollTasks, 8000);
+</script>
+</body>
+</html>
