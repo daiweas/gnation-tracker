@@ -124,8 +124,8 @@
     content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: transparent; transition: background 0.18s;
   }
   .task:hover { background: var(--surface2); transform: translateY(-1px); box-shadow: var(--shadow); }
-  .task.done { opacity: 0.5; }
-  .task.done::before { background: var(--white); }
+  .task.done { opacity: 0.75; background: rgba(74,124,89,0.07); border-color: rgba(74,124,89,0.25); }
+  .task.done::before { background: #4a7c59; }
   .task.in-progress::before { background: var(--accent); }
   .task.todo::before { background: var(--muted2); }
 
@@ -139,7 +139,7 @@
   }
   .badge-todo { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
   .badge-progress { background: var(--accent-soft); color: #ff5b5b; border: 1px solid var(--accent-border); }
-  .badge-done { background: rgba(255,255,255,0.08); color: var(--white); border: 1px solid rgba(255,255,255,0.2); }
+  .badge-done { background: rgba(74,124,89,0.15); color: #6dab82; border: 1px solid rgba(74,124,89,0.35); }
 
   .task-meta { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   .meta-item { font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 4px; }
