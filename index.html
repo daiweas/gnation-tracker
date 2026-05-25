@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>GNÄTION // Трекер</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Unbounded:wght@400;600;700;900&display=swap');
 
@@ -257,6 +258,7 @@
 <div class="sync-bar">
   <div class="sync-dot loading" id="sync-dot"></div>
   <span id="sync-label">Подключение...</span>
+  <span id="whoami" style="margin-left:auto;color:var(--muted);font-size:10px"></span>
 </div>
 
 <div class="tabs-wrap">
@@ -362,12 +364,85 @@
 const SUPABASE_URL = 'https://cetppwtxkkucyylfpxlq.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_Xxp4jkRbsWeVroqrp2siKw_efm94XXM';
 
+// ===== АВТОРИЗАЦИЯ ПО TELEGRAM ID =====
+// Сопоставление Telegram ID -> id участника в базе.
+// Чтобы добавить нового (Джон, Ксюша) — впиши строку: ЧИСЛО_ID: 'id_в_базе',
+const TG_ID_MAP = {
+  840314306:  'daiw',     // DAIW (Саша)
+  973224270:  'tuti',     // тути фрути (Катя)
+  1766832597: 'luka',     // Лука
+  888236045:  'andrey',   // Андрей
+  781212677:  'ulfsees',  // ulfsees (Саня)
+  // saintrap: впиши ID Джона сюда
+  // ksusha:   впиши ID Ксюши сюда
+};
+
+// Кто админ (может всё: участники, удаление, редактирование любых задач)
+const ADMIN_IDS = [840314306, 973224270, 1766832597]; // DAIW, тути, Лука
+
+let CURRENT_USER = null;   // id участника (daiw/tuti/...) или null
+let IS_ADMIN = false;
+let TG_ID = null;
+
+function initAuth() {
+  try {
+    const tg = window.Telegram && window.Telegram.WebApp;
+    if (tg) {
+      tg.ready();
+      tg.expand();
+      const u = tg.initDataUnsafe && tg.initDataUnsafe.user;
+      if (u && u.id) TG_ID = u.id;
+    }
+  } catch(e) {}
+
+  // для отладки в обычном браузере: ?as=840314306
+  const urlAs = new URLSearchParams(location.search).get('as');
+  if (!TG_ID && urlAs) TG_ID = parseInt(urlAs);
+
+  if (TG_ID && TG_ID_MAP[TG_ID]) {
+    CURRENT_USER = TG_ID_MAP[TG_ID];
+    IS_ADMIN = ADMIN_IDS.includes(TG_ID);
+  } else {
+    CURRENT_USER = null;
+    IS_ADMIN = false;
+  }
+}
+
+// может ли текущий юзер редактировать задачу t
+function canEditTask(t) {
+  if (IS_ADMIN) return true;
+  if (!CURRENT_USER) return false;
+  return getPersons(t).includes(CURRENT_USER);
+}
+
 // палитра для новых участников (чёрно-бело-красная)
 const MEMBER_PALETTE = [
   { color:'#ffffff', bg:'#1a1a1a' },
   { color:'#B00000', bg:'#1a0000' },
   { color:'#cccccc', bg:'#161616' },
 ];
+
+// цвет участника по роли: "Артист" -> красный, иначе белый
+function colorForRole(role) {
+  const isArtist = /артист/i.test(role || '');
+  return isArtist
+    ? { color:'#B00000', bg:'#1a0000' }
+    : { color:'#ffffff', bg:'#1a1a1a' };
+}
+
+function updateWhoami() {
+  const el = document.getElementById('whoami');
+  if (!el) return;
+  if (CURRENT_USER) {
+    const m = MEMBERS.find(x => x.id === CURRENT_USER);
+    const name = m ? m.display : CURRENT_USER;
+    el.textContent = IS_ADMIN ? `${name} · админ` : `${name}`;
+    el.style.color = IS_ADMIN ? '#ff5b5b' : 'var(--muted)';
+  } else {
+    el.textContent = '👁 только просмотр';
+    el.style.color = 'var(--muted)';
+  }
+}
 
 const PROJECT_LABELS = {
   'record-track': 'Запись трека',
@@ -428,6 +503,7 @@ async function loadAll() {
     if (!mRes.ok) throw new Error('members: ' + JSON.stringify(MEMBERS));
     if (!tRes.ok) throw new Error('tasks: ' + JSON.stringify(tasks));
     buildTabs();
+    updateWhoami();
     setSyncStatus('ok', 'Синхронизировано · ' + now());
     renderAll();
   } catch(e) {
@@ -464,6 +540,8 @@ async function updateTask(id, fields) {
 }
 
 async function deleteTask(id) {
+  const t = tasks.find(x => x.id === id);
+  if (t && !canEditTask(t)) { alert('У тебя нет прав удалить эту задачу'); return; }
   tasks = tasks.filter(t => t.id !== id);
   renderAll();
   setSyncStatus('loading', 'Удаление...');
@@ -502,24 +580,25 @@ function buildTabs() {
   const manageBtn = document.createElement('button');
   manageBtn.className = 'tab'; manageBtn.textContent = '⚙ участники';
   manageBtn.onclick = openMembersModal;
-  wrap.appendChild(manageBtn);
+  if (IS_ADMIN) wrap.appendChild(manageBtn);
 
   const pagesWrap = document.getElementById('member-pages');
   pagesWrap.innerHTML = '';
   MEMBERS.forEach(m => {
+    const col = colorForRole(m.role);
     const div = document.createElement('div');
     div.className = 'page' + (currentTab===m.id?' active':''); div.id = 'page-' + m.id;
     div.innerHTML = `
-      <div class="member-card" style="border-left:3px solid ${m.color}">
+      <div class="member-card" style="border-left:3px solid ${col.color}">
         <div class="member-card-top">
           <div class="member-header" style="margin-bottom:0">
-            <div class="avatar" style="background:${m.bg};color:${m.color};">${(m.display||'?').slice(0,2).toUpperCase()}</div>
+            <div class="avatar" style="background:${col.bg};color:${col.color};">${(m.display||'?').slice(0,2).toUpperCase()}</div>
             <div>
-              <div class="member-name" style="color:${m.color}">${m.display}</div>
+              <div class="member-name" style="color:${col.color}">${m.display}</div>
               <div class="member-role">${m.role||''}</div>
             </div>
           </div>
-          <button class="edit-member-btn" onclick="openMemberEdit('${m.id}')">Изм.</button>
+          ${IS_ADMIN ? `<button class="edit-member-btn" onclick="openMemberEdit('${m.id}')">Изм.</button>` : ''}
         </div>
         <div class="member-stats" id="mstats-${m.id}" style="margin-top:12px"></div>
       </div>
@@ -586,14 +665,15 @@ function taskHTML(t) {
   const projLabel = PROJECT_LABELS[t.project] || t.project;
   const st = STATUS_META[t.status] || STATUS_META['todo'];
   const persons = getPersons(t).map(personLabel).join(', ');
+  const editable = canEditTask(t);
   return `
     <div class="task ${st.taskCls}">
       <div class="task-top">
-        <div class="task-name" onclick="cycleStatus(${t.id}, '${t.status}')">${escapeHtml(t.name)}</div>
+        <div class="task-name" ${editable ? `onclick="cycleStatus(${t.id}, '${t.status}')"` : ''}>${escapeHtml(t.name)}</div>
         <div class="task-actions">
-          <span class="status-badge ${st.cls}" onclick="cycleStatus(${t.id}, '${t.status}')">${st.label}</span>
-          <button class="icon-btn" title="Редактировать" onclick="openEditModal(${t.id})">✎</button>
-          <button class="icon-btn del" title="Удалить" onclick="deleteTask(${t.id})">×</button>
+          <span class="status-badge ${st.cls}" ${editable ? `onclick="cycleStatus(${t.id}, '${t.status}')"` : ''}>${st.label}</span>
+          ${editable ? `<button class="icon-btn" title="Редактировать" onclick="openEditModal(${t.id})">✎</button>` : ''}
+          ${editable ? `<button class="icon-btn del" title="Удалить" onclick="deleteTask(${t.id})">×</button>` : ''}
         </div>
       </div>
       <div class="task-meta">
@@ -611,6 +691,8 @@ function escapeHtml(s) {
 }
 
 async function cycleStatus(id, currentStatus) {
+  const t = tasks.find(x => x.id === id);
+  if (t && !canEditTask(t)) return;
   const cycle = ['todo','in-progress','done'];
   const nextStatus = cycle[(cycle.indexOf(currentStatus) + 1) % cycle.length];
   tasks = tasks.map(t => t.id === id ? {...t, status: nextStatus} : t);
@@ -645,6 +727,7 @@ function openModal(context) {
 function openEditModal(id) {
   const t = tasks.find(x => x.id === id);
   if (!t) return;
+  if (!canEditTask(t)) { alert('У тебя нет прав редактировать эту задачу'); return; }
   editingTaskId = id;
   document.getElementById('modal-title').textContent = 'Редактировать задачу';
   document.getElementById('btn-del-task').style.display = 'block';
@@ -773,6 +856,7 @@ function deleteFromModal() {
 
 // ---------- MEMBERS MANAGEMENT ----------
 function openMembersModal() {
+  if (!IS_ADMIN) return;
   membersDraft = MEMBERS.map(m => ({...m}));
   renderMembersList();
   document.getElementById('members-modal').classList.add('open');
@@ -782,23 +866,35 @@ function closeMembersModal() {
 }
 function renderMembersList() {
   const wrap = document.getElementById('members-list');
-  wrap.innerHTML = membersDraft.map((m,i) => `
+  wrap.innerHTML = membersDraft.map((m,i) => {
+    const col = colorForRole(m.role);
+    return `
     <div class="member-row">
-      <div class="avatar" style="width:32px;height:32px;font-size:11px;background:${m.bg};color:${m.color};border-radius:9px">${(m.display||'?').slice(0,2).toUpperCase()}</div>
+      <div class="avatar" id="mdraft-av-${i}" style="width:32px;height:32px;font-size:11px;background:${col.bg};color:${col.color};border-radius:9px">${(m.display||'?').slice(0,2).toUpperCase()}</div>
       <div style="flex:1">
-        <input type="text" value="${escapeAttr(m.display)}" placeholder="Имя" style="padding:7px 9px;font-size:12px" oninput="membersDraft[${i}].display=this.value">
-        <input type="text" value="${escapeAttr(m.role||'')}" placeholder="Роль" style="padding:6px 9px;font-size:11px;margin-top:5px;color:var(--muted)" oninput="membersDraft[${i}].role=this.value">
+        <input type="text" value="${escapeAttr(m.display)}" placeholder="Имя" style="padding:7px 9px;font-size:12px" oninput="membersDraft[${i}].display=this.value; updateDraftAvatar(${i})">
+        <input type="text" value="${escapeAttr(m.role||'')}" placeholder="Роль (впиши «Артист» для красного)" style="padding:6px 9px;font-size:11px;margin-top:5px;color:var(--muted)" oninput="membersDraft[${i}].role=this.value; updateDraftAvatar(${i})">
       </div>
       <button class="icon-btn del" title="Удалить" onclick="removeMemberDraft(${i})">×</button>
     </div>
-  `).join('');
+  `;
+  }).join('');
+}
+function updateDraftAvatar(i) {
+  const m = membersDraft[i];
+  const av = document.getElementById('mdraft-av-'+i);
+  if (!av) return;
+  const col = colorForRole(m.role);
+  av.style.background = col.bg;
+  av.style.color = col.color;
+  av.textContent = (m.display||'?').slice(0,2).toUpperCase();
 }
 function escapeAttr(s){ return String(s==null?'':s).replace(/"/g,'&quot;'); }
 
 function addMemberRow() {
-  const pal = MEMBER_PALETTE[membersDraft.length % MEMBER_PALETTE.length];
   const newId = 'm_' + Date.now().toString(36);
-  membersDraft.push({ id:newId, display:'', role:'', color:pal.color, bg:pal.bg, sort_order:(membersDraft.length+1)*10, _isNew:true });
+  const col = colorForRole('');
+  membersDraft.push({ id:newId, display:'', role:'', color:col.color, bg:col.bg, sort_order:(membersDraft.length+1)*10, _isNew:true });
   renderMembersList();
 }
 function removeMemberDraft(i) {
@@ -821,7 +917,8 @@ async function saveMembers() {
     for (let i=0;i<membersDraft.length;i++) {
       const m = membersDraft[i];
       if (!m.display.trim()) continue;
-      const body = { id:m.id, display:m.display.trim(), role:m.role||'', color:m.color, bg:m.bg, sort_order:(i+1)*10 };
+      const col = colorForRole(m.role);
+      const body = { id:m.id, display:m.display.trim(), role:m.role||'', color:col.color, bg:col.bg, sort_order:(i+1)*10 };
       await api('members?id=eq.'+m.id, { method:'PATCH', body: JSON.stringify(body) }).then(async r=>{
         const arr = await r.json();
         if (!arr || arr.length===0) {
@@ -840,6 +937,7 @@ async function saveMembers() {
 
 // одиночное редактирование с страницы участника
 function openMemberEdit(id) {
+  if (!IS_ADMIN) return;
   editingMemberId = id;
   const m = MEMBERS.find(x=>x.id===id);
   if (!m) return;
@@ -895,6 +993,7 @@ document.getElementById('filters').addEventListener('click', e => {
   });
 });
 
+initAuth();
 loadAll();
 setInterval(pollTasks, 8000);
 </script>
