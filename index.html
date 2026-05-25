@@ -173,7 +173,7 @@
     <div class="form-group"><label>Название</label><input type="text" id="f-name" placeholder="Что нужно сделать?" /></div>
     <div class="form-group">
       <label>Проект</label>
-      <select id="f-project">
+      <select id="f-project" onchange="toggleCustomProject(this.value)">
         <option value="track">Трек saintrap</option>
         <option value="recording">Запись Луки</option>
         <option value="video">Видос с вопросами</option>
@@ -181,7 +181,9 @@
         <option value="visual">Обложка / визуал</option>
         <option value="course">Онлайн-курс</option>
         <option value="other">Другое</option>
+        <option value="custom">✏️ Свой проект...</option>
       </select>
+      <input type="text" id="f-project-custom" placeholder="Название проекта" style="display:none; margin-top:8px;" />
     </div>
     <div class="form-group"><label>Ответственный</label><select id="f-person"></select></div>
     <div class="form-group">
@@ -508,14 +510,34 @@ function closeModal() {
   document.getElementById('f-name').value = '';
   document.getElementById('f-note').value = '';
   document.getElementById('f-status').value = 'todo';
+  document.getElementById('f-project').value = 'track';
+  document.getElementById('f-project-custom').style.display = 'none';
+  document.getElementById('f-project-custom').value = '';
+}
+
+function toggleCustomProject(val) {
+  const custom = document.getElementById('f-project-custom');
+  if (val === 'custom') {
+    custom.style.display = 'block';
+    custom.focus();
+  } else {
+    custom.style.display = 'none';
+  }
 }
 
 async function saveTask() {
   const name = document.getElementById('f-name').value.trim();
   if (!name) { document.getElementById('f-name').focus(); return; }
+  const projectSel = document.getElementById('f-project').value;
+  let project = projectSel;
+  if (projectSel === 'custom') {
+    const customVal = document.getElementById('f-project-custom').value.trim();
+    if (!customVal) { document.getElementById('f-project-custom').focus(); return; }
+    project = customVal;
+  }
   const fields = {
     name,
-    project: document.getElementById('f-project').value,
+    project,
     person: document.getElementById('f-person').value,
     day: document.getElementById('f-day').value,
     status: document.getElementById('f-status').value,
