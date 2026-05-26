@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -376,6 +377,11 @@
 
 <div id="member-pages"></div>
 
+<div id="page-archive" class="page">
+  <div class="section-label">Архив выполненных задач</div>
+  <div id="archive-list"><div class="empty">Загрузка...</div></div>
+</div>
+
 <!-- CONFIRM DELETE MODAL -->
 <div class="confirm-modal-overlay" id="confirm-modal">
   <div class="confirm-modal">
@@ -698,6 +704,13 @@ function buildTabs() {
     btn.onclick = () => switchTab(m.id);
     wrap.appendChild(btn);
   });
+  const archiveBtn = document.createElement('button');
+  archiveBtn.className = 'tab' + (currentTab==='archive'?' active':'');
+  archiveBtn.dataset.tab = 'archive';
+  archiveBtn.textContent = 'Архив';
+  archiveBtn.onclick = () => switchTab('archive');
+  wrap.appendChild(archiveBtn);
+
   const manageBtn = document.createElement('button');
   manageBtn.className = 'tab'; manageBtn.innerHTML = icon('settings', 12) + ' участники';
   manageBtn.onclick = openMembersModal;
@@ -805,9 +818,63 @@ function closeConfirm() {
 }
 
 // ---------- RENDER ----------
+// ---------- ARCHIVE ----------
+function renderArchive() {
+  const el = document.getElementById('archive-list');
+  if (!el) return;
+  const done = tasks
+    .filter(t => t.status === 'done')
+    .sort((a,b) => new Date(b.completed_at||b.created_at) - new Date(a.completed_at||a.created_at));
+
+  if (!done.length) {
+    el.innerHTML = '<div class="empty">Выполненных задач пока нет</div>';
+    return;
+  }
+
+  const MONTHS_RU = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+  const groups = {};
+  done.forEach(t => {
+    const d = new Date(t.completed_at || t.created_at);
+    const key = `${MONTHS_RU[d.getMonth()]} ${d.getFullYear()}`;
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(t);
+  });
+
+  let html = '';
+  for (const [month, items] of Object.entries(groups)) {
+    html += `<div class="task-section-head">
+      <span class="sec-dot" style="background:#4a7c59"></span>
+      <span>${month}</span>
+      <span class="sec-count">${items.length}</span>
+      <span class="sec-line"></span>
+    </div>`;
+    html += items.map(t => {
+      const persons = getPersons(t).map(personLabel).join(', ');
+      const d = new Date(t.completed_at || t.created_at);
+      const dateStr = `${d.getDate()} ${['янв','фев','мар','апр','мая','июн','июл','авг','сен','окт','ноя','дек'][d.getMonth()]}`;
+      const projLabel = PROJECT_LABELS[t.project] || t.project;
+      return `
+        <div class="task done">
+          <div class="task-top">
+            <div class="task-name">${escapeHtml(t.name)}</div>
+            <span class="status-badge badge-done">Готово</span>
+          </div>
+          <div class="task-meta">
+            <span class="project-tag">${projLabel}</span>
+            ${persons ? `<span class="meta-item">${icon('user',13)} <span>${escapeHtml(persons)}</span></span>` : ''}
+            <span class="meta-item">${icon('calendar',13)} <span>${dateStr}</span></span>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+  el.innerHTML = html;
+}
+
 function renderAll() {
   renderAllTasks();
   MEMBERS.forEach(m => renderMember(m));
+  renderArchive();
   const total = tasks.length;
   const done = tasks.filter(t => t.status === 'done').length;
   const inprog = tasks.filter(t => t.status === 'in-progress').length;
@@ -936,9 +1003,12 @@ async function cycleStatus(id, currentStatus) {
   if (t && !canEditTask(t)) return;
   const cycle = ['todo','in-progress','delayed','done'];
   const nextStatus = cycle[(cycle.indexOf(currentStatus) + 1) % cycle.length];
-  tasks = tasks.map(t => t.id === id ? {...t, status: nextStatus} : t);
+  const extra = nextStatus === 'done'
+    ? { completed_at: new Date().toISOString() }
+    : currentStatus === 'done' ? { completed_at: null } : {};
+  tasks = tasks.map(t => t.id === id ? {...t, status: nextStatus, ...extra} : t);
   renderAll();
-  await updateTask(id, { status: nextStatus });
+  await updateTask(id, { status: nextStatus, ...extra });
 }
 
 
