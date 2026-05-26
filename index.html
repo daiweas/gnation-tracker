@@ -359,7 +359,6 @@
     <button class="filter-btn" data-filter="todo">Не начато</button>
     <button class="filter-btn" data-filter="in-progress">В работе</button>
     <button class="filter-btn" data-filter="delayed">Задерживается</button>
-    <button class="filter-btn" data-filter="done">Готово</button>
     <button class="filter-btn" data-filter="overdue"><svg class="ic" width="13" height="13" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2.5 L16.5 15 H1.5 Z"/><path d="M9 7 V10.5 M9 12.7 V12.9"/></svg>Просрочено</button>
   </div>
   <div class="toolbar">
@@ -659,13 +658,31 @@ async function updateTask(id, fields) {
 async function deleteTask(id) {
   const t = tasks.find(x => x.id === id);
   if (t && !canEditTask(t)) { alert('У тебя нет прав удалить эту задачу'); return; }
-  tasks = tasks.filter(t => t.id !== id);
+  const deletedAt = new Date().toISOString();
+  tasks = tasks.map(x => x.id === id ? {...x, deleted_at: deletedAt} : x);
   renderAll();
   setSyncStatus('loading', 'Удаление...');
   try {
-    await api('tasks?id=eq.' + id, { method:'DELETE', prefer:'' });
+    await api('tasks?id=eq.' + id, { method:'PATCH', body: JSON.stringify({ deleted_at: deletedAt }) });
     setSyncStatus('ok', 'Удалено · ' + now());
   } catch(e) { setSyncStatus('err', 'Ошибка удаления'); }
+}
+
+// физическое удаление из архива — только для админов
+async function hardDeleteTask(id) {
+  tasks = tasks.filter(x => x.id !== id);
+  renderAll();
+  setSyncStatus('loading', 'Удаление из архива...');
+  try {
+    await api('tasks?id=eq.' + id, { method:'DELETE', prefer:'' });
+    setSyncStatus('ok', 'Удалено из архива · ' + now());
+  } catch(e) { setSyncStatus('err', 'Ошибка удаления'); }
+}
+
+function confirmHardDelete(id) {
+  const t = tasks.find(x => x.id === id);
+  if (!t) return;
+  showConfirm('Удалить навсегда?', `«${t.name}» будет удалена из архива без возможности восстановления.`, () => hardDeleteTask(id));
 }
 
 function confirmDeleteTask(id) {
@@ -822,23 +839,31 @@ function closeConfirm() {
 function renderArchive() {
   const el = document.getElementById('archive-list');
   if (!el) return;
-  const done = tasks
-    .filter(t => t.status === 'done')
-    .sort((a,b) => new Date(b.completed_at||b.created_at) - new Date(a.completed_at||a.created_at));
 
-  if (!done.length) {
-    el.innerHTML = '<div class="empty">Выполненных задач пока нет</div>';
+  const archived = tasks
+    .filter(t => t.status === 'done' || t.deleted_at)
+    .sort((a,b) => {
+      const da = new Date(a.deleted_at || a.completed_at || a.created_at);
+      const db = new Date(b.deleted_at || b.completed_at || b.created_at);
+      return db - da;
+    });
+
+  if (!archived.length) {
+    el.innerHTML = '<div class="empty">Архив пуст</div>';
     return;
   }
 
   const MONTHS_RU = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
   const groups = {};
-  done.forEach(t => {
-    const d = new Date(t.completed_at || t.created_at);
+  archived.forEach(t => {
+    const d = new Date(t.deleted_at || t.completed_at || t.created_at);
     const key = `${MONTHS_RU[d.getMonth()]} ${d.getFullYear()}`;
     if (!groups[key]) groups[key] = [];
     groups[key].push(t);
   });
+
+  const STATUS_LABELS = { 'todo':'Не начато', 'in-progress':'В работе', 'delayed':'Задерживается', 'done':'Готово' };
+  const STATUS_CLS = { 'todo':'badge-todo', 'in-progress':'badge-inprogress', 'delayed':'badge-delayed', 'done':'badge-done' };
 
   let html = '';
   for (const [month, items] of Object.entries(groups)) {
@@ -850,14 +875,20 @@ function renderArchive() {
     </div>`;
     html += items.map(t => {
       const persons = getPersons(t).map(personLabel).join(', ');
-      const d = new Date(t.completed_at || t.created_at);
+      const d = new Date(t.deleted_at || t.completed_at || t.created_at);
       const dateStr = `${d.getDate()} ${['янв','фев','мар','апр','мая','июн','июл','авг','сен','окт','ноя','дек'][d.getMonth()]}`;
       const projLabel = PROJECT_LABELS[t.project] || t.project;
+      const isDeleted = !!t.deleted_at;
+      const statusLabel = STATUS_LABELS[t.status] || t.status;
+      const statusCls = STATUS_CLS[t.status] || 'badge-todo';
       return `
-        <div class="task done">
+        <div class="task done" style="${isDeleted ? 'opacity:0.6' : ''}">
           <div class="task-top">
-            <div class="task-name">${escapeHtml(t.name)}</div>
-            <span class="status-badge badge-done">Готово</span>
+            <div class="task-name">${escapeHtml(t.name)}${isDeleted ? ' <span style="font-size:10px;color:var(--muted);font-weight:400">удалена</span>' : ''}</div>
+            <div class="task-actions">
+              <span class="status-badge ${statusCls}">${statusLabel}</span>
+              ${IS_ADMIN ? `<button class="icon-btn del" title="Удалить навсегда" onclick="confirmHardDelete(${t.id})">×</button>` : ''}
+            </div>
           </div>
           <div class="task-meta">
             <span class="project-tag">${projLabel}</span>
@@ -928,6 +959,7 @@ function renderAllTasks() {
   const list = document.getElementById('all-tasks-list');
   const search = (document.getElementById('search-input')?.value || '').toLowerCase().trim();
   let filtered = tasks.filter(t => {
+    if (t.status === 'done' || t.deleted_at) return false; // done и удалённые — только в архиве
     if (currentFilter === 'overdue') return isOverdue(t);
     if (currentFilter !== 'all' && t.status !== currentFilter) return false;
     return true;
