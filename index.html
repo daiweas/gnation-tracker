@@ -135,6 +135,53 @@
   .task.done .task-name { text-decoration: line-through; color: var(--muted); }
   .task-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
 
+
+  /* STATUS MENU */
+  .status-menu-overlay {
+    display: none; position: fixed; inset: 0; z-index: 150;
+    background: rgba(0,0,0,0.6); backdrop-filter: blur(6px);
+    align-items: flex-end; justify-content: center; padding-bottom: 0;
+  }
+  .status-menu-overlay.open { display: flex; animation: fadeIn 0.18s ease; }
+  @keyframes fadeIn { from { opacity:0 } to { opacity:1 } }
+  .status-menu {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 20px 20px 0 0; width: 100%; max-width: 480px;
+    padding: 10px 12px 32px; animation: slideUp 0.22s cubic-bezier(0.34,1.1,0.64,1);
+  }
+  @keyframes slideUp { from { transform: translateY(100%) } to { transform: translateY(0) } }
+  .status-menu-handle {
+    width: 36px; height: 4px; background: var(--border); border-radius: 2px;
+    margin: 4px auto 14px;
+  }
+  .status-menu-title {
+    font-size: 11px; color: var(--muted); font-weight: 500;
+    padding: 0 4px; margin-bottom: 10px; letter-spacing: 0.3px;
+  }
+  .status-menu-task {
+    font-family: 'Unbounded', sans-serif; font-size: 13px; font-weight: 700;
+    color: var(--white); padding: 0 4px; margin-bottom: 14px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .status-option {
+    display: flex; align-items: center; gap: 12px;
+    padding: 13px 14px; border-radius: 12px; cursor: pointer;
+    transition: background 0.15s; margin-bottom: 4px;
+    border: 1px solid transparent;
+  }
+  .status-option:hover { background: var(--surface2); }
+  .status-option.current { background: var(--surface2); border-color: var(--border); }
+  .status-option-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .status-option-label { font-size: 13px; font-weight: 500; color: var(--text); flex: 1; }
+  .status-option-check { font-size: 14px; color: var(--accent); }
+  .status-menu-cancel {
+    width: 100%; padding: 14px; margin-top: 6px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 12px; color: var(--muted); font-family: 'Inter', sans-serif;
+    font-size: 13px; cursor: pointer; transition: color 0.15s;
+  }
+  .status-menu-cancel:hover { color: var(--text); }
+
   .status-badge {
     font-size: 10px; font-weight: 600; padding: 4px 11px; border-radius: 100px; white-space: nowrap;
   }
@@ -685,6 +732,24 @@ function confirmHardDelete(id) {
   showConfirm('Удалить навсегда?', `«${t.name}» будет удалена из архива без возможности восстановления.`, () => hardDeleteTask(id));
 }
 
+async function restoreTask(id) {
+  if (!CURRENT_USER) return;
+  tasks = tasks.map(x => x.id === id ? {...x, status: 'todo', completed_at: null, deleted_at: null} : x);
+  renderAll();
+  setSyncStatus('loading', 'Возврат задачи...');
+  try {
+    await api('tasks?id=eq.' + id, { method:'PATCH', body: JSON.stringify({ status: 'todo', completed_at: null, deleted_at: null }) });
+    setSyncStatus('ok', 'Задача возвращена · ' + now());
+  } catch(e) { setSyncStatus('err', 'Ошибка'); }
+}
+
+function confirmRestore(id) {
+  if (!CURRENT_USER) return;
+  const t = tasks.find(x => x.id === id);
+  if (!t) return;
+  showConfirm('Вернуть задачу?', `«${t.name}» вернётся в список со статусом "Не начато".`, () => restoreTask(id));
+}
+
 function confirmDeleteTask(id) {
   const t = tasks.find(x => x.id === id);
   if (!t) return;
@@ -887,6 +952,7 @@ function renderArchive() {
             <div class="task-name">${escapeHtml(t.name)}${isDeleted ? ' <span style="font-size:10px;color:var(--muted);font-weight:400">удалена</span>' : ''}</div>
             <div class="task-actions">
               <span class="status-badge ${statusCls}">${statusLabel}</span>
+              ${CURRENT_USER ? `<button class="icon-btn" title="Вернуть в список" onclick="confirmRestore(${t.id})" style="font-size:13px">↩</button>` : ''}
               ${IS_ADMIN ? `<button class="icon-btn del" title="Удалить навсегда" onclick="confirmHardDelete(${t.id})">×</button>` : ''}
             </div>
           </div>
@@ -1009,9 +1075,9 @@ function taskHTML(t) {
   return `
     <div class="task ${st.taskCls}${extraCls}">
       <div class="task-top">
-        <div class="task-name" ${editable ? `onclick="cycleStatus(${t.id}, '${t.status}')"` : ''}>${escapeHtml(t.name)}${overdueBadge}</div>
+        <div class="task-name" ${editable ? `onclick="openStatusMenu(${t.id})"` : ''}>${escapeHtml(t.name)}${overdueBadge}</div>
         <div class="task-actions">
-          <span class="status-badge ${st.cls}" ${editable ? `onclick="cycleStatus(${t.id}, '${t.status}')"` : ''}>${st.label}</span>
+          <span class="status-badge ${st.cls}" ${editable ? `onclick="openStatusMenu(${t.id})"` : ''}>${st.label}</span>
           ${editable ? `<button class="icon-btn" title="Редактировать" onclick="openEditModal(${t.id})">${icon('edit',14)}</button>` : ''}
           ${editable ? `<button class="icon-btn del" title="Удалить" onclick="confirmDeleteTask(${t.id})">×</button>` : ''}
         </div>
@@ -1030,17 +1096,68 @@ function escapeHtml(s) {
   return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
-async function cycleStatus(id, currentStatus) {
+// ---------- STATUS MENU ----------
+const STATUS_OPTIONS = [
+  { value: 'todo',        label: 'Не начато',     dot: '#555' },
+  { value: 'in-progress', label: 'В работе',      dot: '#B00000' },
+  { value: 'delayed',     label: 'Задерживается', dot: '#c87c00' },
+  { value: 'done',        label: 'Готово',        dot: '#4a7c59' },
+];
+
+let statusMenuTaskId = null;
+
+function openStatusMenu(id) {
   const t = tasks.find(x => x.id === id);
-  if (t && !canEditTask(t)) return;
-  const cycle = ['todo','in-progress','delayed','done'];
-  const nextStatus = cycle[(cycle.indexOf(currentStatus) + 1) % cycle.length];
-  const extra = nextStatus === 'done'
+  if (!t || !canEditTask(t)) return;
+  statusMenuTaskId = id;
+  document.getElementById('status-menu-task-name').textContent = t.name;
+  const opts = STATUS_OPTIONS.map(o => `
+    <div class="status-option ${t.status === o.value ? 'current' : ''}" onclick="selectStatus('${o.value}')">
+      <span class="status-option-dot" style="background:${o.dot}"></span>
+      <span class="status-option-label">${o.label}</span>
+      ${t.status === o.value ? '<span class="status-option-check">✓</span>' : ''}
+    </div>
+  `).join('');
+  document.getElementById('status-menu-options').innerHTML = opts;
+  document.getElementById('status-menu').classList.add('open');
+}
+
+function closeStatusMenu() {
+  document.getElementById('status-menu').classList.remove('open');
+  statusMenuTaskId = null;
+}
+
+const STATUS_CONFIRM = {
+  'todo':        { title: 'Вернуть в очередь?',     text: (name) => `«${name}» снова станет активной.` },
+  'in-progress': { title: 'Взять в работу?',         text: (name) => `«${name}» — статус изменится на "В работе".` },
+  'delayed':     { title: 'Пометить как задержку?',  text: (name) => `«${name}» — статус изменится на "Задерживается".` },
+  'done':        { title: 'Задача выполнена?',        text: (name) => `«${name}» уйдёт в архив.` },
+};
+
+function selectStatus(newStatus) {
+  const id = statusMenuTaskId;
+  const t = tasks.find(x => x.id === id);
+  if (!t) return;
+  if (newStatus === t.status) { closeStatusMenu(); return; }
+  const conf = STATUS_CONFIRM[newStatus];
+  closeStatusMenu();
+  showConfirm(conf.title, conf.text(t.name), () => applyStatus(id, newStatus));
+}
+
+async function applyStatus(id, newStatus) {
+  const t = tasks.find(x => x.id === id);
+  if (!t) return;
+  const extra = newStatus === 'done'
     ? { completed_at: new Date().toISOString() }
-    : currentStatus === 'done' ? { completed_at: null } : {};
-  tasks = tasks.map(t => t.id === id ? {...t, status: nextStatus, ...extra} : t);
+    : t.status === 'done' ? { completed_at: null } : {};
+  tasks = tasks.map(x => x.id === id ? {...x, status: newStatus, ...extra} : x);
   renderAll();
-  await updateTask(id, { status: nextStatus, ...extra });
+  await updateTask(id, { status: newStatus, ...extra });
+}
+
+// оставляем cycleStatus как алиас на случай старых вызовов
+async function cycleStatus(id, currentStatus) {
+  openStatusMenu(id);
 }
 
 
@@ -1343,5 +1460,16 @@ initAuth();
 loadAll();
 setInterval(pollTasks, 8000);
 </script>
+
+<!-- STATUS MENU -->
+<div class="status-menu-overlay" id="status-menu" onclick="if(event.target===this)closeStatusMenu()">
+  <div class="status-menu">
+    <div class="status-menu-handle"></div>
+    <div class="status-menu-title">Изменить статус</div>
+    <div class="status-menu-task" id="status-menu-task-name"></div>
+    <div id="status-menu-options"></div>
+    <button class="status-menu-cancel" onclick="closeStatusMenu()">Отмена</button>
+  </div>
+</div>
 </body>
 </html>
