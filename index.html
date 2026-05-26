@@ -844,6 +844,7 @@ const ICONS = {
   eye:      '<path d="M1.5 9 C3.5 5 6 3.5 9 3.5 C12 3.5 14.5 5 16.5 9 C14.5 13 12 14.5 9 14.5 C6 14.5 3.5 13 1.5 9 Z"/><circle cx="9" cy="9" r="2.6"/>',
   subtask:  '<path d="M4 3 V10 C4 12 5 13 8 13 H14"/><path d="M11 10 L14 13 L11 16" fill="none"/>',
   edit:     '<path d="M11.5 3 L15 6.5 L6.5 15 H3 V11.5 Z"/><path d="M10 4.5 L13.5 8"/>',
+  restore:  '<path d="M3.5 9 C3.5 5.9 6 3.5 9 3.5 C12 3.5 14.5 6 14.5 9 C14.5 12 12 14.5 9 14.5"/><path d="M3.5 5 L3.5 9 L7.5 9"/>',
 };
 function icon(name, size) {
   const sz = size || 14;
@@ -952,7 +953,7 @@ function renderArchive() {
             <div class="task-name">${escapeHtml(t.name)}${isDeleted ? ' <span style="font-size:10px;color:var(--muted);font-weight:400">удалена</span>' : ''}</div>
             <div class="task-actions">
               <span class="status-badge ${statusCls}">${statusLabel}</span>
-              ${CURRENT_USER ? `<button class="icon-btn" title="Вернуть в список" onclick="confirmRestore(${t.id})" style="font-size:13px">↩</button>` : ''}
+              ${CURRENT_USER ? `<button class="icon-btn" title="Вернуть в список" onclick="confirmRestore(${t.id})">${icon('restore',14)}</button>` : ''}
               ${IS_ADMIN ? `<button class="icon-btn del" title="Удалить навсегда" onclick="confirmHardDelete(${t.id})">×</button>` : ''}
             </div>
           </div>
