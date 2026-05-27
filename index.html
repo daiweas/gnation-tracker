@@ -295,6 +295,50 @@
   .add-member-inline { width: 100%; padding: 11px; background: transparent; border: 1px dashed var(--border); border-radius: var(--radius-sm); color: var(--muted); font-family: 'Inter', sans-serif; font-size: 12px; cursor: pointer; transition: all 0.18s; margin-top: 4px; }
   .add-member-inline:hover { border-color: var(--accent-border); color: #ff5b5b; }
 
+
+  /* PRIORITY */
+  .priority-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
+  .priority-high   { background: #B00000; box-shadow: 0 0 5px rgba(176,0,0,0.5); }
+  .priority-medium { background: #c87c00; }
+  .priority-low    { background: #444; }
+  .task.pinned { border-color: rgba(255,255,255,0.18); }
+  .task.pinned::after { content: ''; position: absolute; top: 0; right: 0; width: 0; height: 0; border-style: solid; border-width: 0 18px 18px 0; border-color: transparent rgba(255,255,255,0.12) transparent transparent; pointer-events: none; }
+  .pin-badge { font-size: 9px; font-weight: 700; padding: 2px 7px; border-radius: 100px; background: rgba(255,255,255,0.08); color: var(--muted); border: 1px solid rgba(255,255,255,0.12); margin-left: 4px; letter-spacing: 0.3px; }
+
+  /* PRIORITY FILTER */
+  .priority-filter { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; align-items: center; }
+  .priority-chip {
+    display: flex; align-items: center; gap: 5px;
+    padding: 6px 12px; border-radius: 100px; border: 1px solid var(--border);
+    background: var(--surface); color: var(--muted); font-family: 'Inter', sans-serif;
+    font-size: 11px; font-weight: 500; cursor: pointer; transition: all 0.15s;
+  }
+  .priority-chip:hover:not(.active) { border-color: #3a3a3c; color: var(--text); }
+  .priority-chip.active { background: var(--surface2); border-color: #3a3a3c; color: var(--text); font-weight: 600; }
+
+  /* PRIORITY SELECT IN FORM */
+  .priority-select-wrap { display: flex; gap: 8px; }
+  .priority-opt {
+    flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px;
+    padding: 9px; border-radius: var(--radius-sm); border: 1px solid var(--border);
+    background: var(--bg); color: var(--muted); font-family: 'Inter', sans-serif;
+    font-size: 12px; cursor: pointer; transition: all 0.15s;
+  }
+  .priority-opt.selected { background: var(--surface2); border-color: #3a3a3c; color: var(--text); font-weight: 600; }
+  .priority-opt[data-p="high"].selected { border-color: rgba(176,0,0,0.5); background: rgba(176,0,0,0.1); color: #ff5b5b; }
+  .priority-opt[data-p="medium"].selected { border-color: rgba(200,124,0,0.5); background: rgba(200,124,0,0.1); color: #e09430; }
+  .priority-opt[data-p="low"].selected { border-color: #3a3a3c; }
+
+  /* PIN TOGGLE */
+  .pin-toggle {
+    display: flex; align-items: center; gap: 8px; padding: 10px 12px;
+    border-radius: var(--radius-sm); border: 1px solid var(--border);
+    background: var(--bg); cursor: pointer; transition: all 0.15s; user-select: none;
+  }
+  .pin-toggle.active { background: var(--surface2); border-color: #3a3a3c; }
+  .pin-toggle-label { font-size: 12px; color: var(--muted); font-family: 'Inter', sans-serif; }
+  .pin-toggle.active .pin-toggle-label { color: var(--text); }
+
   /* SVG ICONS */
   .ic { display: inline-block; vertical-align: -2px; flex-shrink: 0; }
   .meta-item .ic { vertical-align: -2.5px; opacity: 0.7; }
@@ -415,6 +459,7 @@
     <button class="sort-btn" id="sort-btn" onclick="toggleSort()">По статусу</button>
   </div>
   <div class="person-filter" id="person-filter"></div>
+  <div class="priority-filter" id="priority-filter"></div>
   <div class="section-label">Все задачи</div>
   <div class="tasks" id="all-tasks-list"><div class="spinner">Загрузка...</div></div>
   <button class="add-btn" onclick="openModal('all')">+ Добавить задачу</button>
@@ -479,6 +524,26 @@
         <option value="delayed">Задерживается</option>
         <option value="done">Готово</option>
       </select>
+    </div>
+    <div class="form-group">
+      <label>Приоритет</label>
+      <div class="priority-select-wrap">
+        <div class="priority-opt selected" data-p="medium" onclick="selectPriority('medium')">
+          <span class="priority-dot priority-medium"></span> Средний
+        </div>
+        <div class="priority-opt" data-p="high" onclick="selectPriority('high')">
+          <span class="priority-dot priority-high"></span> Высокий
+        </div>
+        <div class="priority-opt" data-p="low" onclick="selectPriority('low')">
+          <span class="priority-dot priority-low"></span> Низкий
+        </div>
+      </div>
+    </div>
+    <div class="form-group">
+      <div class="pin-toggle" id="pin-toggle" onclick="togglePin()">
+        <svg class="ic" width="14" height="14" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2 L9 11 M6 11 L12 11 M9 11 L9 16"/><path d="M5 2 L13 2 L13 8 C13 10 11 11 9 11 C7 11 5 10 5 8 Z"/></svg>
+        <span class="pin-toggle-label">Закрепить задачу</span>
+      </div>
     </div>
     <div class="form-group"><label>Заметка</label><textarea id="f-note" placeholder="Детали..."></textarea></div>
 
@@ -632,6 +697,9 @@ let editingMemberId = null;
 let currentSort = 'date';     // 'date' | 'status'
 let confirmCallback = null;   // для confirm modal
 let personFilter = 'all';     // 'all' | id участника
+let priorityFilter = 'all';   // 'all' | 'high' | 'medium' | 'low'
+let currentPriority = 'medium';
+let currentPinned = false;
 
 function api(path, opts={}) {
   return fetch(SUPABASE_URL + '/rest/v1/' + path, {
@@ -666,6 +734,7 @@ async function loadAll() {
     if (!tRes.ok) throw new Error('tasks: ' + JSON.stringify(tasks));
     buildTabs();
     buildPersonFilter();
+    buildPriorityFilter();
     updateWhoami();
     setSyncStatus('ok', 'Синхронизировано · ' + now());
     renderAll();
@@ -682,7 +751,7 @@ async function pollTasks() {
     ]);
     const m = await mRes.json();
     const t = await tRes.json();
-    if (JSON.stringify(m) !== JSON.stringify(MEMBERS)) { MEMBERS = m; buildTabs(); buildPersonFilter(); }
+    if (JSON.stringify(m) !== JSON.stringify(MEMBERS)) { MEMBERS = m; buildTabs(); buildPersonFilter(); buildPriorityFilter(); }
     if (JSON.stringify(t) !== JSON.stringify(tasks)) { tasks = t; }
     renderAll();
     setSyncStatus('ok', 'Обновлено · ' + now());
@@ -842,6 +911,7 @@ const ICONS = {
   eye:      '<path d="M1.5 9 C3.5 5 6 3.5 9 3.5 C12 3.5 14.5 5 16.5 9 C14.5 13 12 14.5 9 14.5 C6 14.5 3.5 13 1.5 9 Z"/><circle cx="9" cy="9" r="2.6"/>',
   subtask:  '<path d="M4 3 V10 C4 12 5 13 8 13 H14"/><path d="M11 10 L14 13 L11 16" fill="none"/>',
   edit:     '<path d="M11.5 3 L15 6.5 L6.5 15 H3 V11.5 Z"/><path d="M10 4.5 L13.5 8"/>',
+  pin:      '<path d="M9 2 L9 11 M6 11 L12 11 M9 11 L9 16"/><path d="M5 2 L13 2 L13 8 C13 10 11 11 9 11 C7 11 5 10 5 8 Z"/>',
   restore:  '<path d="M5 3.5 L3 6.5 L6.5 7"/><path d="M3.2 5.8 A6 6 0 1 1 3 10"/>',
 };
 function icon(name, size) {
@@ -880,11 +950,12 @@ function toggleSort() {
 }
 
 function sortedTasks(arr) {
+  const pinSort = (a,b) => (b.pinned?1:0) - (a.pinned?1:0);
   if (currentSort === 'status') {
     const order = { 'in-progress': 0, 'todo': 1, 'delayed': 2, 'done': 3 };
-    return [...arr].sort((a,b) => (order[a.status]??1) - (order[b.status]??1));
+    return [...arr].sort((a,b) => (b.pinned?1:0)-(a.pinned?1:0) || (order[a.status]??1) - (order[b.status]??1));
   }
-  return [...arr].sort((a,b) => a.id - b.id);
+  return [...arr].sort((a,b) => (b.pinned?1:0)-(a.pinned?1:0) || a.id - b.id);
 }
 
 // ---------- CONFIRM MODAL ----------
@@ -990,6 +1061,28 @@ function renderAll() {
 }
 
 // ---------- PERSON FILTER ----------
+function buildPriorityFilter() {
+  const wrap = document.getElementById('priority-filter');
+  if (!wrap) return;
+  const opts = [
+    { val:'all',    label:'Все приоритеты', dot: null },
+    { val:'high',   label:'Высокий',  cls:'priority-high' },
+    { val:'medium', label:'Средний',  cls:'priority-medium' },
+    { val:'low',    label:'Низкий',   cls:'priority-low' },
+  ];
+  wrap.innerHTML = opts.map(o => `
+    <div class="priority-chip ${priorityFilter===o.val?'active':''}" onclick="setPriorityFilter('${o.val}')">
+      ${o.dot === null ? '' : `<span class="priority-dot ${o.cls}"></span>`}
+      ${o.label}
+    </div>
+  `).join('');
+}
+function setPriorityFilter(val) {
+  priorityFilter = val;
+  buildPriorityFilter();
+  renderAllTasks();
+}
+
 function buildPersonFilter() {
   const wrap = document.getElementById('person-filter');
   if (!wrap) return;
@@ -1041,6 +1134,9 @@ function renderAllTasks() {
   if (personFilter !== 'all') {
     filtered = filtered.filter(t => getPersons(t).includes(personFilter));
   }
+  if (priorityFilter !== 'all') {
+    filtered = filtered.filter(t => (t.priority || 'medium') === priorityFilter);
+  }
   if (search) {
     filtered = filtered.filter(t =>
       (t.name||'').toLowerCase().includes(search) ||
@@ -1078,12 +1174,19 @@ function taskHTML(t) {
   const persons = getPersons(t).map(personLabel).join(', ');
   const editable = canEditTask(t);
   const overdue = isOverdue(t);
-  const extraCls = overdue ? ' overdue' : '';
+  const priority = t.priority || 'medium';
+  const priorityCls = { high:'priority-high', medium:'priority-medium', low:'priority-low' }[priority];
+  const pinnedCls = t.pinned ? ' pinned' : '';
+  const extraCls = (overdue ? ' overdue' : '') + pinnedCls;
   const overdueBadge = overdue ? `<span class="badge-overdue">просрочено</span>` : '';
+  const pinBadge = t.pinned ? `<span class="pin-badge">закреплено</span>` : '';
   return `
     <div class="task ${st.taskCls}${extraCls}">
       <div class="task-top">
-        <div class="task-name" ${editable ? `onclick="openStatusMenu(${t.id})"` : ''}>${escapeHtml(t.name)}${overdueBadge}</div>
+        <div class="task-name" ${editable ? `onclick="openStatusMenu(${t.id})"` : ''} style="display:flex;align-items:center;gap:7px;flex:1">
+          <span class="priority-dot ${priorityCls}" title="Приоритет: ${priority}"></span>
+          <span>${escapeHtml(t.name)}${overdueBadge}${pinBadge}</span>
+        </div>
         <div class="task-actions">
           <span class="status-badge ${st.cls}" ${editable ? `onclick="openStatusMenu(${t.id})"` : ''}>${st.label}</span>
           ${editable ? `<button class="icon-btn" title="Редактировать" onclick="openEditModal(${t.id})">${icon('edit',14)}</button>` : ''}
@@ -1176,6 +1279,19 @@ async function cycleStatus(id, currentStatus) {
 
 
 
+// ---------- PRIORITY & PIN ----------
+function selectPriority(val) {
+  currentPriority = val;
+  document.querySelectorAll('.priority-opt').forEach(el => {
+    el.classList.toggle('selected', el.dataset.p === val);
+  });
+}
+function togglePin() {
+  currentPinned = !currentPinned;
+  const el = document.getElementById('pin-toggle');
+  if (el) el.classList.toggle('active', currentPinned);
+}
+
 // ---------- TASK MODAL ----------
 function renderPersonCheckboxes(selected) {
   const wrap = document.getElementById('f-persons');
@@ -1239,6 +1355,10 @@ function openEditModal(id) {
 
   document.getElementById('f-status').value = t.status || 'todo';
   document.getElementById('f-note').value = t.note || '';
+  selectPriority(t.priority || 'medium');
+  currentPinned = !!t.pinned;
+  const pt = document.getElementById('pin-toggle');
+  if (pt) pt.classList.toggle('active', currentPinned);
   document.getElementById('modal').classList.add('open');
 }
 
@@ -1251,6 +1371,10 @@ function closeModal() {
   document.getElementById('f-project-custom').style.display = 'none';
   document.getElementById('f-project-custom').value = '';
   document.getElementById('f-person-custom').value = '';
+  selectPriority('medium');
+  currentPinned = false;
+  const pt = document.getElementById('pin-toggle');
+  if (pt) pt.classList.remove('active');
   editingTaskId = null;
 }
 
@@ -1346,6 +1470,8 @@ async function saveTask() {
     name, project, person, day,
     status: document.getElementById('f-status').value,
     note: document.getElementById('f-note').value.trim(),
+    priority: currentPriority,
+    pinned: currentPinned,
   };
 
   const idToUpdate = editingTaskId;
