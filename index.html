@@ -907,6 +907,14 @@ function buildTabs() {
   allBtn.className = 'tab' + (currentTab==='all'?' active':''); allBtn.dataset.tab = 'all';
   allBtn.innerHTML = `Все${allActive ? `<span class="tab-count">${allActive}</span>` : ''}`; allBtn.onclick = () => switchTab('all');
   wrap.appendChild(allBtn);
+
+  const statsBtn = document.createElement('button');
+  statsBtn.className = 'tab' + (currentTab==='stats'?' active':'');
+  statsBtn.dataset.tab = 'stats';
+  statsBtn.textContent = 'Стата';
+  statsBtn.onclick = () => { switchTab('stats'); renderStats(); };
+  wrap.appendChild(statsBtn);
+
   MEMBERS.forEach(m => {
     const btn = document.createElement('button');
     btn.className = 'tab' + (currentTab===m.id?' active':''); btn.dataset.tab = m.id;
@@ -921,13 +929,6 @@ function buildTabs() {
   archiveBtn.textContent = 'Архив';
   archiveBtn.onclick = () => switchTab('archive');
   wrap.appendChild(archiveBtn);
-
-  const statsBtn = document.createElement('button');
-  statsBtn.className = 'tab' + (currentTab==='stats'?' active':'');
-  statsBtn.dataset.tab = 'stats';
-  statsBtn.textContent = 'Стата';
-  statsBtn.onclick = () => { switchTab('stats'); renderStats(); };
-  wrap.appendChild(statsBtn);
 
   const manageBtn = document.createElement('button');
   manageBtn.className = 'tab'; manageBtn.innerHTML = icon('settings', 12) + ' участники';
