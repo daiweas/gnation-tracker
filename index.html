@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -521,6 +520,7 @@
 <script>
 const SUPABASE_URL = 'https://cetppwtxkkucyylfpxlq.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_Xxp4jkRbsWeVroqrp2siKw_efm94XXM';
+const BOT_TOKEN = '8983813743:AAEnLeYtCTQivQkENz5SJ_jVZvcg89XI7ig';
 
 // ===== АВТОРИЗАЦИЯ ПО TELEGRAM ID =====
 // Сопоставление Telegram ID -> id участника в базе.
@@ -1277,6 +1277,26 @@ function parseDayToISO(label) {
   return `2026-${String(mon+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
 }
 
+
+// ---------- NOTIFICATIONS ----------
+async function notifyPersons(personIds, taskName, dayLabel) {
+  const assigner = MEMBERS.find(x => x.id === CURRENT_USER);
+  const assignerName = assigner ? assigner.display : 'Кто-то';
+  for (const pid of personIds) {
+    // не уведомлять того кто назначает — сам себе
+    const tgEntry = Object.entries(TG_ID_MAP).find(([k, v]) => v === pid);
+    if (!tgEntry) continue;
+    const recipientTgId = parseInt(tgEntry[0]);
+    if (recipientTgId === TG_ID) continue;
+    const text = `📋 Тебе назначена задача\n\n*${taskName}*\n\n👤 От: ${assignerName}\n📅 Срок: ${dayLabel || 'Без срока'}`;
+    fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: recipientTgId, text, parse_mode: 'Markdown' })
+    }).catch(() => {});
+  }
+}
+
 async function saveTask() {
   const name = document.getElementById('f-name').value.trim();
   if (!name) { document.getElementById('f-name').focus(); return; }
@@ -1312,8 +1332,13 @@ async function saveTask() {
 
   const idToUpdate = editingTaskId;
   closeModal();
-  if (idToUpdate) await updateTask(idToUpdate, fields);
-  else await createTask(fields);
+  if (idToUpdate) {
+    await updateTask(idToUpdate, fields);
+  } else {
+    await createTask(fields);
+    // уведомить ответственных
+    if (checked.length) notifyPersons(checked, name, fields.day);
+  }
 }
 
 function deleteFromModal() {
