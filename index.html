@@ -1161,6 +1161,12 @@ async function applyStatus(id, newStatus) {
   tasks = tasks.map(x => x.id === id ? {...x, status: newStatus, ...extra} : x);
   renderAll();
   await updateTask(id, { status: newStatus, ...extra });
+  // уведомить автора задачи когда выполнена
+  if (newStatus === 'done' && t.created_by && t.created_by !== CURRENT_USER) {
+    const doer = MEMBERS.find(x => x.id === CURRENT_USER);
+    const doerName = doer ? doer.display : 'Кто-то';
+    notifyOne(t.created_by, `✅ Задача выполнена\n\n*${t.name}*\n\n👤 Выполнил: ${doerName}`);
+  }
 }
 
 // оставляем cycleStatus как алиас на случай старых вызовов
@@ -1279,16 +1285,28 @@ function parseDayToISO(label) {
 
 
 // ---------- NOTIFICATIONS ----------
-async function notifyPersons(personIds, taskName, dayLabel) {
+async function notifyOne(memberId, text) {
+  const tgEntry = Object.entries(TG_ID_MAP).find(([k, v]) => v === memberId);
+  if (!tgEntry) return;
+  const tgId = parseInt(tgEntry[0]);
+  fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chat_id: tgId, text, parse_mode: 'Markdown' })
+  }).catch(() => {});
+}
+
+async function notifyPersons(personIds, taskName, dayLabel, isEdit) {
   const assigner = MEMBERS.find(x => x.id === CURRENT_USER);
   const assignerName = assigner ? assigner.display : 'Кто-то';
   for (const pid of personIds) {
-    // не уведомлять того кто назначает — сам себе
     const tgEntry = Object.entries(TG_ID_MAP).find(([k, v]) => v === pid);
     if (!tgEntry) continue;
     const recipientTgId = parseInt(tgEntry[0]);
     if (recipientTgId === TG_ID) continue;
-    const text = `📋 Тебе назначена задача\n\n*${taskName}*\n\n👤 От: ${assignerName}\n📅 Срок: ${dayLabel || 'Без срока'}`;
+    const emoji = isEdit ? '✏️' : '📋';
+    const action = isEdit ? 'Твоя задача изменена' : 'Тебе назначена задача';
+    const text = `${emoji} ${action}\n\n*${taskName}*\n\n👤 ${isEdit ? 'Изменил' : 'От'}: ${assignerName}\n📅 Срок: ${dayLabel || 'Без срока'}`;
     fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1331,13 +1349,26 @@ async function saveTask() {
   };
 
   const idToUpdate = editingTaskId;
+  const taskName = name;
   closeModal();
   if (idToUpdate) {
+    // уведомить ответственных об изменении
+    const oldTask = tasks.find(x => x.id === idToUpdate);
     await updateTask(idToUpdate, fields);
+    // уведомить автора задачи если он не тот кто редактирует
+    if (oldTask && oldTask.created_by && oldTask.created_by !== CURRENT_USER) {
+      const editor = MEMBERS.find(x => x.id === CURRENT_USER);
+      const editorName = editor ? editor.display : 'Кто-то';
+      notifyOne(oldTask.created_by, `✏️ Задача изменена\n\n*${taskName}*\n\n👤 Изменил: ${editorName}`);
+    }
+    // уведомить ответственных об изменении (кроме редактора и автора)
+    const newPersons = checked.filter(p => p !== CURRENT_USER && p !== (oldTask && oldTask.created_by));
+    if (newPersons.length) notifyPersons(newPersons, taskName, fields.day, true);
   } else {
-    await createTask(fields);
-    // уведомить ответственных
-    if (checked.length) notifyPersons(checked, name, fields.day);
+    const newFields = { ...fields, created_by: CURRENT_USER };
+    await createTask(newFields);
+    // уведомить ответственных о новой задаче
+    if (checked.length) notifyPersons(checked, taskName, fields.day, false);
   }
 }
 
