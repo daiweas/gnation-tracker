@@ -339,6 +339,37 @@
   .pin-toggle-label { font-size: 12px; color: var(--muted); font-family: 'Inter', sans-serif; }
   .pin-toggle.active .pin-toggle-label { color: var(--text); }
 
+
+  /* STATS PAGE */
+  .stats-page { padding: 0; }
+  .stats-metrics { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; margin-bottom: 20px; }
+  .stats-metric { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 12px; }
+  .stats-metric-num { font-family: 'Unbounded', sans-serif; font-size: 22px; font-weight: 700; color: var(--white); line-height: 1; margin-bottom: 4px; }
+  .stats-metric-num.red { color: #ff5b5b; }
+  .stats-metric-label { font-size: 10px; color: var(--muted); letter-spacing: 0.5px; }
+  .stats-section { margin-bottom: 22px; }
+  .stats-section-title { font-family: 'Unbounded', sans-serif; font-size: 11px; font-weight: 700; color: var(--white); margin-bottom: 14px; letter-spacing: 0.5px; }
+  .activity-grid { display: flex; flex-direction: column; gap: 3px; }
+  .activity-row { display: flex; gap: 3px; }
+  .activity-cell { width: 13px; height: 13px; border-radius: 3px; background: var(--surface2); flex-shrink: 0; }
+  .activity-cell.l1 { background: rgba(176,0,0,0.2); }
+  .activity-cell.l2 { background: rgba(176,0,0,0.45); }
+  .activity-cell.l3 { background: rgba(176,0,0,0.7); }
+  .activity-cell.l4 { background: #B00000; }
+  .activity-days { display: flex; gap: 3px; margin-bottom: 5px; }
+  .activity-day { width: 13px; font-size: 9px; color: var(--muted); text-align: center; }
+  .activity-footer { display: flex; justify-content: space-between; margin-top: 6px; }
+  .activity-footer span { font-size: 9px; color: var(--muted2); }
+  .activity-legend { display: flex; align-items: center; gap: 4px; margin-top: 8px; }
+  .activity-legend span { font-size: 9px; color: var(--muted2); }
+  .legend-cells { display: flex; gap: 3px; }
+  .member-stat-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .member-stat-avatar { width: 28px; height: 28px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-family: 'Unbounded', sans-serif; font-size: 10px; font-weight: 700; flex-shrink: 0; }
+  .member-stat-name { font-size: 12px; font-weight: 500; color: var(--text); width: 72px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .member-stat-bar-wrap { flex: 1; background: var(--surface2); border-radius: 100px; height: 5px; overflow: hidden; }
+  .member-stat-bar { height: 100%; border-radius: 100px; background: #B00000; transition: width 0.4s ease; }
+  .member-stat-count { font-size: 11px; color: var(--muted); width: 32px; text-align: right; flex-shrink: 0; }
+
   /* SVG ICONS */
   .ic { display: inline-block; vertical-align: -2px; flex-shrink: 0; }
   .meta-item .ic { vertical-align: -2.5px; opacity: 0.7; }
@@ -466,6 +497,37 @@
 </div>
 
 <div id="member-pages"></div>
+
+
+<div id="page-stats" class="page">
+  <div class="stats-page">
+    <div class="stats-metrics" id="stats-metrics"></div>
+    <div class="stats-section">
+      <div class="stats-section-title">Активность — 4 недели</div>
+      <div class="activity-days" id="activity-days"></div>
+      <div class="activity-grid" id="activity-grid"></div>
+      <div class="activity-footer">
+        <span>4 нед. назад</span>
+        <span>сегодня</span>
+      </div>
+      <div class="activity-legend">
+        <span>Меньше</span>
+        <div class="legend-cells">
+          <div class="activity-cell"></div>
+          <div class="activity-cell l1"></div>
+          <div class="activity-cell l2"></div>
+          <div class="activity-cell l3"></div>
+          <div class="activity-cell l4"></div>
+        </div>
+        <span>Больше</span>
+      </div>
+    </div>
+    <div class="stats-section">
+      <div class="stats-section-title">Участники</div>
+      <div id="member-stats-list"></div>
+    </div>
+  </div>
+</div>
 
 <div id="page-archive" class="page">
   <div class="section-label">Архив выполненных задач</div>
@@ -860,6 +922,13 @@ function buildTabs() {
   archiveBtn.onclick = () => switchTab('archive');
   wrap.appendChild(archiveBtn);
 
+  const statsBtn = document.createElement('button');
+  statsBtn.className = 'tab' + (currentTab==='stats'?' active':'');
+  statsBtn.dataset.tab = 'stats';
+  statsBtn.textContent = 'Стата';
+  statsBtn.onclick = () => { switchTab('stats'); renderStats(); };
+  wrap.appendChild(statsBtn);
+
   const manageBtn = document.createElement('button');
   manageBtn.className = 'tab'; manageBtn.innerHTML = icon('settings', 12) + ' участники';
   manageBtn.onclick = openMembersModal;
@@ -897,6 +966,7 @@ function switchTab(tabId) {
   currentTab = tabId;
   document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tabId));
   document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + tabId));
+  if (tabId === 'stats') renderStats();
 }
 
 // ---------- HELPERS ----------
@@ -1060,6 +1130,117 @@ function renderAll() {
   document.getElementById('progress-fill').style.width = total ? (done/total*100)+'%' : '0%';
 }
 
+
+// ---------- STATS PAGE ----------
+function renderStats() {
+  renderStatsMetrics();
+  renderActivityGrid();
+  renderMemberStatsList();
+}
+
+function renderStatsMetrics() {
+  const el = document.getElementById('stats-metrics');
+  if (!el) return;
+  const total = tasks.filter(t => !t.deleted_at).length;
+  const done = tasks.filter(t => t.status === 'done').length;
+  const inprog = tasks.filter(t => t.status === 'in-progress').length;
+  const delayed = tasks.filter(t => t.status === 'delayed').length;
+
+  // закрыто за эту неделю
+  const now = new Date();
+  const weekAgo = new Date(now); weekAgo.setDate(now.getDate() - 7); weekAgo.setHours(0,0,0,0);
+  const closedThisWeek = tasks.filter(t => t.completed_at && new Date(t.completed_at) >= weekAgo).length;
+
+  el.innerHTML = `
+    <div class="stats-metric"><div class="stats-metric-num">${total}</div><div class="stats-metric-label">Всего задач</div></div>
+    <div class="stats-metric"><div class="stats-metric-num">${done}</div><div class="stats-metric-label">Выполнено</div></div>
+    <div class="stats-metric"><div class="stats-metric-num red">${inprog}</div><div class="stats-metric-label">В работе</div></div>
+    <div class="stats-metric"><div class="stats-metric-num">${closedThisWeek}</div><div class="stats-metric-label">За эту неделю</div></div>
+  `;
+}
+
+function renderActivityGrid() {
+  const daysEl = document.getElementById('activity-days');
+  const gridEl = document.getElementById('activity-grid');
+  if (!daysEl || !gridEl) return;
+
+  const DAY_LABELS = ['пн','вт','ср','чт','пт','сб','вс'];
+  daysEl.innerHTML = DAY_LABELS.map(d => `<div class="activity-day">${d}</div>`).join('');
+
+  // строим карту дата -> кол-во закрытых задач
+  const countMap = {};
+  tasks.forEach(t => {
+    if (!t.completed_at) return;
+    const d = new Date(t.completed_at);
+    const key = d.toISOString().slice(0,10);
+    countMap[key] = (countMap[key] || 0) + 1;
+  });
+
+  // последние 4 недели = 28 дней, сгруппированных по неделям (строки)
+  const today = new Date(); today.setHours(0,0,0,0);
+  // найти понедельник 4 недели назад
+  const startDay = new Date(today);
+  const dow = (today.getDay() + 6) % 7; // 0=пн
+  startDay.setDate(today.getDate() - dow - 21);
+
+  // максимум для нормировки
+  const maxVal = Math.max(1, ...Object.values(countMap));
+
+  let html = '';
+  for (let week = 0; week < 4; week++) {
+    html += '<div class="activity-row">';
+    for (let day = 0; day < 7; day++) {
+      const d = new Date(startDay);
+      d.setDate(startDay.getDate() + week * 7 + day);
+      const key = d.toISOString().slice(0,10);
+      const val = countMap[key] || 0;
+      let lvl = '';
+      if (val > 0) {
+        const ratio = val / maxVal;
+        if (ratio <= 0.25) lvl = 'l1';
+        else if (ratio <= 0.5) lvl = 'l2';
+        else if (ratio <= 0.75) lvl = 'l3';
+        else lvl = 'l4';
+      }
+      const isFuture = d > today;
+      html += `<div class="activity-cell ${lvl}" style="${isFuture?'opacity:0.3':''}" title="${key}: ${val}"></div>`;
+    }
+    html += '</div>';
+  }
+  gridEl.innerHTML = html;
+}
+
+function renderMemberStatsList() {
+  const el = document.getElementById('member-stats-list');
+  if (!el) return;
+
+  const rows = MEMBERS.map(m => {
+    const myTasks = tasks.filter(t => getPersons(t).includes(m.id) && !t.deleted_at);
+    const myDone = myTasks.filter(t => t.status === 'done').length;
+    const total = myTasks.length;
+    const pct = total > 0 ? Math.round(myDone / total * 100) : 0;
+    return { m, myDone, total, pct };
+  }).sort((a,b) => b.pct - a.pct || b.myDone - a.myDone);
+
+  const col = (m) => {
+    const isArtist = /артист/i.test(m.role || '');
+    return isArtist ? { color:'#B00000', bg:'#1a0000' } : { color:'#ffffff', bg:'#1a1a1a' };
+  };
+
+  el.innerHTML = rows.map(({m, myDone, total, pct}) => {
+    const c = col(m);
+    return `
+      <div class="member-stat-row">
+        <div class="member-stat-avatar" style="background:${c.bg};color:${c.color}">${(m.display||'?').slice(0,2).toUpperCase()}</div>
+        <div class="member-stat-name">${escapeHtml(m.display)}</div>
+        <div class="member-stat-bar-wrap"><div class="member-stat-bar" style="width:${pct}%"></div></div>
+        <div class="member-stat-count">${myDone}/${total}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+
 // ---------- PERSON FILTER ----------
 function buildPriorityFilter() {
   const wrap = document.getElementById('priority-filter');
@@ -1179,7 +1360,7 @@ function taskHTML(t) {
   const pinnedCls = t.pinned ? ' pinned' : '';
   const extraCls = (overdue ? ' overdue' : '') + pinnedCls;
   const overdueBadge = overdue ? `<span class="badge-overdue">просрочено</span>` : '';
-  const pinBadge = t.pinned ? `<svg class="pin-icon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none" viewBox="0 0 24 24"><path d="M17 4a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v1l2 4v2l-2 1v2h5v5l1 2 1-2v-5h5v-2l-2-1V9l2-4V4z"/></svg>` : '';
+  const pinBadge = t.pinned ? `<svg class="pin-icon" width="13" height="13" viewBox="0 0 18 18" fill="currentColor" stroke="none"><path d="M11 2C10.4 2 9.9 2.4 9.7 3L8.5 6.5C7.5 6.8 6.7 7.4 6.2 8.2L3 8.9C2.5 9 2.2 9.5 2.4 10L3.6 12.4L2.3 15.7C2.1 16.2 2.4 16.8 2.9 17C3.4 17.2 4 16.9 4.2 16.4L5.5 13.1L7.9 14.3C8.4 14.5 8.9 14.2 9 13.7L9.7 10.5C10.5 10 11.1 9.2 11.4 8.2L14.9 7C15.5 6.8 15.9 6.3 15.8 5.7L15.1 3.1C14.9 2.5 14.3 2.1 13.7 2.2L11 2Z"/></svg>` : '';
   return `
     <div class="task ${st.taskCls}${extraCls}">
       <div class="task-top">
