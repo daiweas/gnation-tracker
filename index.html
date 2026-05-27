@@ -303,7 +303,7 @@
   .priority-low    { background: #444; }
   .task.pinned { border-color: rgba(255,255,255,0.18); }
   .task.pinned::after { content: ''; position: absolute; top: 0; right: 0; width: 0; height: 0; border-style: solid; border-width: 0 18px 18px 0; border-color: transparent rgba(255,255,255,0.12) transparent transparent; pointer-events: none; }
-  .pin-badge { font-size: 9px; font-weight: 700; padding: 2px 7px; border-radius: 100px; background: rgba(255,255,255,0.08); color: var(--muted); border: 1px solid rgba(255,255,255,0.12); margin-left: 4px; letter-spacing: 0.3px; }
+  .pin-icon { position: absolute; top: 9px; left: 9px; color: rgba(255,255,255,0.35); pointer-events: none; z-index: 1; }
 
   /* PRIORITY FILTER */
   .priority-filter { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; align-items: center; }
@@ -1179,13 +1179,13 @@ function taskHTML(t) {
   const pinnedCls = t.pinned ? ' pinned' : '';
   const extraCls = (overdue ? ' overdue' : '') + pinnedCls;
   const overdueBadge = overdue ? `<span class="badge-overdue">просрочено</span>` : '';
-  const pinBadge = t.pinned ? `<span class="pin-badge">закреплено</span>` : '';
+  const pinBadge = t.pinned ? `<svg class="pin-icon" width="13" height="13" viewBox="0 0 18 18" fill="currentColor" stroke="none"><path d="M11 2C10.4 2 9.9 2.4 9.7 3L8.5 6.5C7.5 6.8 6.7 7.4 6.2 8.2L3 8.9C2.5 9 2.2 9.5 2.4 10L3.6 12.4L2.3 15.7C2.1 16.2 2.4 16.8 2.9 17C3.4 17.2 4 16.9 4.2 16.4L5.5 13.1L7.9 14.3C8.4 14.5 8.9 14.2 9 13.7L9.7 10.5C10.5 10 11.1 9.2 11.4 8.2L14.9 7C15.5 6.8 15.9 6.3 15.8 5.7L15.1 3.1C14.9 2.5 14.3 2.1 13.7 2.2L11 2Z"/></svg>` : '';
   return `
     <div class="task ${st.taskCls}${extraCls}">
       <div class="task-top">
         <div class="task-name" ${editable ? `onclick="openStatusMenu(${t.id})"` : ''} style="display:flex;align-items:center;gap:7px;flex:1">
           <span class="priority-dot ${priorityCls}" title="Приоритет: ${priority}"></span>
-          <span>${escapeHtml(t.name)}${overdueBadge}${pinBadge}</span>
+          ${pinBadge}<span>${escapeHtml(t.name)}${overdueBadge}</span>
         </div>
         <div class="task-actions">
           <span class="status-badge ${st.cls}" ${editable ? `onclick="openStatusMenu(${t.id})"` : ''}>${st.label}</span>
